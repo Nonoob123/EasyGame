@@ -954,7 +954,7 @@ class Game {
 
         return {
             PLAYER_IMAGE_DATA_URL: 'https://lh3.googleusercontent.com/d/1ZbALRrI1ovwRX2H7uK91kezYkNZKOJTZ',
-            ENEMY_IMAGE_DATA_URL: 'https://lh3.googleusercontent.com/d/1Vl0llLgYdOMM5ZFU7yBP-9-8rodK_W85',
+            ENEMY_IMAGE_DATA_URL: 'https://lh3.googleusercontent.com/d/1BXLyjksU2o8tT9T5suuzYa0mxVowEp2a',
             WORLD_WIDTH: 2400, WORLD_HEIGHT: WORLD_HEIGHT,
             get SAFE_ZONE_WIDTH() { const sw=TILE_SIZE*2; const sm=TILE_SIZE*2; const sb=TILE_SIZE*3; return sm+sw+sb; },
             get SAFE_ZONE_TOP_Y() { return topBuildingY - verticalBuffer; },
