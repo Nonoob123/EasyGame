@@ -73,7 +73,7 @@ class Player extends Entity {
 
         this.wood = 20;
         this.diamond = 0;
-        this.gold = 200; // 初始金幣
+        this.gold = 200000; // 初始金幣
         this.attackTimer = 0;
 
         // --- 武器系統狀態 ---
@@ -1570,6 +1570,9 @@ class Game {
             BOSS_IMAGE_URL: 'https://lh3.googleusercontent.com/d/1_Yfz7kU6GCg28W5xFw7r3hi1pW67cZYb',
             TREE_IMAGE_URL: 'https://lh3.googleusercontent.com/d/18Dg-zoR7ImttNuvDpfaWucLP658spVE3',
 
+            // --- 鏡頭縮放 ---
+            CAMERA_ZOOM: 1.5, // 放大倍數，> 1 表示放大
+
             WORLD_WIDTH: 2400, WORLD_HEIGHT: WORLD_HEIGHT,
             get SAFE_ZONE_WIDTH() { const sw=TILE_SIZE*2; const sm=TILE_SIZE*2; const sb=TILE_SIZE*3; return sm+sw+sb; },
             get SAFE_ZONE_TOP_Y() { return topBuildingY - verticalBuffer; },
@@ -1799,16 +1802,30 @@ class Game {
         preloadImage('tree', urls.tree); 
 
         // 初始檢查：如果根本沒有需要加載的圖片 (所有URL都無效或為空)
-        if (this.imagesToLoad === 0) {
-            console.warn("沒有有效的圖片 URL 需要加載。");
+        if (this.imagesToLoad === 0 && imagesStatus.player) { // 如果沒有需要異步加載的圖片（都無效或玩家圖也失敗/未定義）
+            console.warn("沒有有效的圖片 URL 需要異步加載。");
             this.areImagesLoaded = true;
-            // 確保 imagesLoaded 也同步，雖然理論上它應該也是 0
+            this.imagesLoaded = 0; // 確保計數為 0
+            // 如果玩家圖片也沒加載成功，可能會有問題，但至少不卡死
+            this.startGameLoop();
+       } else if (this.imagesToLoad > 0) { // 如果確實有圖片需要加載
+            // 檢查是否所有圖片已經立即完成 (主要針對緩存情況)
+            // 注意：這個檢查可能不完全準確，因為 imagesStatus 可能尚未被回調更新
+            // 更可靠的是完全依賴 imageLoadCallback 中的計數
+            const initiallyProcessed = Object.values(imagesStatus).filter(status => status).length;
+            if (initiallyProcessed >= this.imagesToLoad && this.imagesLoaded < this.imagesToLoad) {
+                // 這個情況比較微妙，可能意味著所有圖片都在緩存中，但回調還沒來得及執行
+                console.log("所有圖片似乎都在緩存中，稍後由回調確認...");
+            } else {
+               console.log(`需要處理 ${this.imagesToLoad} 張圖片。等待回調...`);
+            }
+            // 不在這裡直接啟動遊戲，等待 imageLoadCallback
+       } else {
+            // imagesToLoad 為 0，但 player 狀態未知，也嘗試啟動
+            console.warn("邊緣情況：沒有圖片計入待加載，嘗試啟動。");
+            this.areImagesLoaded = true;
             this.imagesLoaded = 0;
             this.startGameLoop();
-       } else {
-            // 如果有圖片需要加載，則等待回調
-            console.log(`需要處理 ${this.imagesToLoad} 張圖片。等待回調...`);
-            // 這裡的 imagesLoaded 會在回調中增加
        }
    }
 
@@ -1969,31 +1986,45 @@ class Game {
 
     draw() {
         if (!this.ctx || !this.player || !this.areImagesLoaded) return;
+        const zoom = this.constants.CAMERA_ZOOM;
         // Clear Canvas
-        this.ctx.save(); this.ctx.setTransform(1, 0, 0, 1, 0, 0); this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height); this.ctx.restore();
-        // Apply Camera
-        this.ctx.save(); this.ctx.translate(-this.camera.x, -this.camera.y);
+        this.ctx.save();
+        this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.restore();
+
+        // Apply Camera and Zoom
+        this.ctx.save();
+        this.ctx.scale(zoom, zoom);
+        this.ctx.translate(-this.camera.x, -this.camera.y);
+
         // Draw Background
         this.drawWorldBackground();
+
         // Draw Entities
-        const cam = this.camera; const cw = this.canvas.width; const ch = this.canvas.height;
-        this.trees.forEach(e => e.isRectInView(cam, cw, ch, 50) && e.draw(this.ctx)); 
-        if (this.tradingPost && this.tradingPost.isRectInView(cam, cw, ch)) this.tradingPost.draw(this.ctx, this);
-        if (this.researchLab && this.researchLab.isRectInView(cam, cw, ch)) this.researchLab.draw(this.ctx, this);
-        if (this.healingRoom && this.healingRoom.isRectInView(cam, cw, ch)) this.healingRoom.draw(this.ctx, this);
-        // Draw Safe Zone Text (after shops, before other entities)
-        this.drawSafeZoneText(); // <--- 將文字繪製抽取為獨立函數調用
-        this.fences.forEach(e=>e.isRectInView(cam,cw,ch)&&e.draw(this.ctx));
-        this.towers.forEach(e=>e.isRectInView(cam,cw,ch)&&e.draw(this.ctx));
-        this.slashEffects.forEach(e=>e.draw(this.ctx));
-        this.arrows.forEach(e=>e.isRectInView(cam,cw,ch,this.constants.ARROW_LENGTH*2)&&e.draw(this.ctx));
-        this.bullets.forEach(e=>e.isRectInView(cam,cw,ch,20)&&e.draw(this.ctx));
-        this.enemies.forEach(e=>e.isRectInView(cam,cw,ch,50)&&e.draw(this.ctx));
-        if(this.player.isRectInView(cam,cw,ch,10)) this.player.draw(this.ctx);
-        // Draw Damage Numbers (on top of entities)
-        this.damageNumbers.forEach(dn => dn.draw(this.ctx)); // <--- 繪製傷害數字
-        // Restore Camera
+        const cam = this.camera;
+        const visibleWidth = this.canvas.width / zoom;
+        const visibleHeight = this.canvas.height / zoom;
+        const leewayMultiplier = 1 / zoom;
+
+        this.trees.forEach(e => e.isRectInView(cam, visibleWidth, visibleHeight, 50 * leewayMultiplier) && e.draw(this.ctx));
+        if (this.tradingPost && this.tradingPost.isRectInView(cam, visibleWidth, visibleHeight)) this.tradingPost.draw(this.ctx, this);
+        if (this.researchLab && this.researchLab.isRectInView(cam, visibleWidth, visibleHeight)) this.researchLab.draw(this.ctx, this);
+        if (this.healingRoom && this.healingRoom.isRectInView(cam, visibleWidth, visibleHeight)) this.healingRoom.draw(this.ctx, this);
+        this.drawSafeZoneText(); // 文字也會被縮放
+        this.fences.forEach(e => e.isRectInView(cam, visibleWidth, visibleHeight) && e.draw(this.ctx));
+        this.towers.forEach(e => e.isRectInView(cam, visibleWidth, visibleHeight) && e.draw(this.ctx));
+        this.slashEffects.forEach(e => e.draw(this.ctx));
+        
+        this.arrows.forEach(e => e.isRectInView(cam, visibleWidth, visibleHeight, this.constants.ARROW_LENGTH * 2 * leewayMultiplier) && e.draw(this.ctx));
+        this.bullets.forEach(e => e.isRectInView(cam, visibleWidth, visibleHeight, 20 * leewayMultiplier) && e.draw(this.ctx));
+        this.enemies.forEach(e => e.isRectInView(cam, visibleWidth, visibleHeight, 50 * leewayMultiplier) && e.draw(this.ctx));
+        if (this.player.isRectInView(cam, visibleWidth, visibleHeight, 10 * leewayMultiplier)) this.player.draw(this.ctx);
+        this.damageNumbers.forEach(dn => dn.draw(this.ctx));
+
+        // Restore Camera and Zoom
         this.ctx.restore();
+
         // Draw UI
         this.drawHUD();
         this.drawMessages();
@@ -2032,13 +2063,31 @@ class Game {
 
     updateCamera() {
         if (!this.player) return;
-        let targetX = this.player.centerX - this.canvas.width / 2;
-        let targetY = this.player.centerY - this.canvas.height / 2;
+
+        const zoom = this.constants.CAMERA_ZOOM;
+        const canvasWidth = this.canvas.width;
+        const canvasHeight = this.canvas.height;
+
+        // 計算縮放後畫布實際顯示的世界寬度和高度
+        const visibleWorldWidth = canvasWidth / zoom;
+        const visibleWorldHeight = canvasHeight / zoom;
+
+        // 計算相機目標位置，使玩家位於縮放後視口的中心
+        let targetX = this.player.centerX - visibleWorldWidth / 2;
+        let targetY = this.player.centerY - visibleWorldHeight / 2;
+
+        // 相機緩慢跟隨 (Lerp)
         const lerpFactor = 0.1;
         this.camera.x += (targetX - this.camera.x) * lerpFactor;
         this.camera.y += (targetY - this.camera.y) * lerpFactor;
-        this.camera.x = Math.max(0, Math.min(this.constants.WORLD_WIDTH - this.canvas.width, this.camera.x));
-        this.camera.y = Math.max(0, Math.min(this.constants.WORLD_HEIGHT - this.canvas.height, this.camera.y));
+
+        // 計算相機的最大可移動範圍 (考慮縮放)
+        const maxX = this.constants.WORLD_WIDTH - visibleWorldWidth;
+        const maxY = this.constants.WORLD_HEIGHT - visibleWorldHeight;
+
+        // 限制相機移動範圍
+        this.camera.x = Math.max(0, Math.min(maxX, this.camera.x));
+        this.camera.y = Math.max(0, Math.min(maxY, this.camera.y));
     }
 
     drawHUD() {
