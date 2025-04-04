@@ -73,7 +73,7 @@ class Player extends Entity {
 
         this.wood = 20;
         this.diamond = 0;
-        this.gold = 200000; // 初始金幣
+        this.gold = 250; // 初始金幣
         this.attackTimer = 0;
 
         // --- 武器系統狀態 ---
@@ -1571,7 +1571,7 @@ class Game {
             TREE_IMAGE_URL: 'https://lh3.googleusercontent.com/d/18Dg-zoR7ImttNuvDpfaWucLP658spVE3',
 
             // --- 鏡頭縮放 ---
-            CAMERA_ZOOM: 1.5, // 放大倍數，> 1 表示放大
+            CAMERA_ZOOM: 1.2, // 放大倍數，> 1 表示放大
 
             WORLD_WIDTH: 2400, WORLD_HEIGHT: WORLD_HEIGHT,
             get SAFE_ZONE_WIDTH() { const sw=TILE_SIZE*2; const sm=TILE_SIZE*2; const sb=TILE_SIZE*3; return sm+sw+sb; },
