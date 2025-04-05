@@ -129,16 +129,15 @@ export class Shop extends Structure {
 
             case 'skill_institute': // 技能研究所 (新增)
                 titleText = "研究所";
-                subtitleText = "(靠近升級技能)";
-                if (player.skillPoints > 0) {
-                    // 簡單顯示可用點數，可以擴展顯示下一個可升級技能
+                subtitleText = "(學習/升級自動技能)"; // 簡化副標題
+                if (player.skillPoints > 0) { // 只根據是否有技能點顯示狀態
                     costText = `可用點數: ${player.skillPoints}🧬`;
                     costColor = '#AAFFAA'; // 綠色表示可用
                 } else {
                     costText = "無可用技能點";
-                    costColor = '#FFAAAA'; // 紅色表示不可用
+                    costColor = '#FFAAAA'; // 紅色表示無點數
                 }
-                break;
+                break; // <--- 確保這裡有 break
         }
 
         // --- 繪製文字 ---

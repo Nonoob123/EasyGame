@@ -156,7 +156,7 @@ export const gameConstants = (() => {
         // --- 商店與效果 ---
         HEALING_COST_PER_HP: 1, // 每點生命值的治療成本（鑽石）
         HEALING_RATE: 200, // 治療速率（毫秒/點 HP）
-        WEAPON_UPGRADE_COOLDOWN: 2000, // 武器升級操作的冷卻時間（防止快速點擊）
+        WEAPON_UPGRADE_COOLDOWN: 500, // 武器升級操作的冷卻時間（防止快速點擊）
         ARROW_SPEED: 8, // 箭矢飛行速度
         ARROW_LENGTH: TILE_SIZE * 0.8, // 箭矢視覺長度
         BULLET_SPEED: 10, // 槍子彈飛行速度
@@ -175,52 +175,60 @@ export const gameConstants = (() => {
 
         // --- 新增：自動玩家技能 ---
         // 技能 1: 範圍攻擊 - 震盪波 (Shockwave)
-        SKILL_AOE1_DAMAGE: 25,       // 基礎傷害
-        SKILL_AOE1_COOLDOWN: 5000,    // 冷卻時間 (毫秒)
+        SKILL_AOE1_DAMAGE: 35,       // 基礎傷害
+        SKILL_AOE1_COOLDOWN: 2000,    // 冷卻時間 (毫秒)
         SKILL_AOE1_RADIUS: TILE_SIZE * 4, // 作用半徑
 
         // 技能 2: 範圍攻擊 - 新星爆發 (Nova)
-        SKILL_AOE2_DAMAGE: 60,       // 基礎傷害
-        SKILL_AOE2_COOLDOWN: 12000,   // 冷卻時間 (毫秒)
+        SKILL_AOE2_DAMAGE: 75,       // 基礎傷害
+        SKILL_AOE2_COOLDOWN: 3000,   // 冷卻時間 (毫秒)
         SKILL_AOE2_RADIUS: TILE_SIZE * 7, // 作用半徑
 
         // 技能 3: 直線穿透 - 能量箭 (Bolt)
-        SKILL_LINEAR1_DAMAGE: 40,    // 基礎傷害
-        SKILL_LINEAR1_COOLDOWN: 7000, // 冷卻時間 (毫秒)
+        SKILL_LINEAR1_DAMAGE: 85,    // 基礎傷害
+        SKILL_LINEAR1_COOLDOWN: 2000, // 冷卻時間 (毫秒)
         SKILL_LINEAR1_RANGE: TILE_SIZE * 10, // 射程
         SKILL_LINEAR1_WIDTH: TILE_SIZE * 0.8, // 寬度
         SKILL_LINEAR1_SPEED: 9,      // 投射物速度
 
         // 技能 4: 直線穿透 - 能量光束 (Beam)
         SKILL_LINEAR2_DAMAGE: 90,    // 基礎傷害
-        SKILL_LINEAR2_COOLDOWN: 15000,// 冷卻時間 (毫秒)
+        SKILL_LINEAR2_COOLDOWN: 3000,// 冷卻時間 (毫秒)
         SKILL_LINEAR2_RANGE: TILE_SIZE * 15, // 射程
         SKILL_LINEAR2_WIDTH: TILE_SIZE * 1.2, // 寬度
         SKILL_LINEAR2_SPEED: 7,      // 投射物速度
 
-        // --- 新增：技能等級與加成 ---
+        // --- 技能等級與加成 ---
         SKILL_MAX_LEVEL: 10, // 所有自動技能的最高等級
 
         // 震盪波 (AOE1) 加成
-        SKILL_AOE1_DAMAGE_PER_LEVEL: 8,     // 每級增加傷害
+        SKILL_AOE1_DAMAGE_PER_LEVEL: 120,     // 每級增加傷害
         SKILL_AOE1_COOLDOWN_MULTIPLIER: 0.94, // 每級冷卻時間乘數 (減少 6%)
         SKILL_AOE1_RADIUS_PER_LEVEL: TILE_SIZE * 0.3, // 每級增加半徑
 
         // 新星爆發 (AOE2) 加成
-        SKILL_AOE2_DAMAGE_PER_LEVEL: 15,    // 每級增加傷害
-        SKILL_AOE2_COOLDOWN_MULTIPLIER: 0.92, // 每級冷卻時間乘數 (減少 8%)
+        SKILL_AOE2_DAMAGE_PER_LEVEL: 250,    // 每級增加傷害
+        SKILL_AOE2_COOLDOWN_MULTIPLIER: 0.95, // 每級冷卻時間乘數 (減少 8%)
         SKILL_AOE2_RADIUS_PER_LEVEL: TILE_SIZE * 0.5, // 每級增加半徑
 
         // 能量箭 (Linear1) 加成
-        SKILL_LINEAR1_DAMAGE_PER_LEVEL: 12,   // 每級增加傷害
+        SKILL_LINEAR1_DAMAGE_PER_LEVEL: 120,   // 每級增加傷害
         SKILL_LINEAR1_COOLDOWN_MULTIPLIER: 0.95,// 每級冷卻時間乘數 (減少 5%)
         SKILL_LINEAR1_RANGE_PER_LEVEL: TILE_SIZE * 0.8, // 每級增加射程
         // SKILL_LINEAR1_WIDTH_PER_LEVEL: TILE_SIZE * 0.05, // 可選：每級增加寬度
 
         // 能量光束 (Linear2) 加成
-        SKILL_LINEAR2_DAMAGE_PER_LEVEL: 25,   // 每級增加傷害
-        SKILL_LINEAR2_COOLDOWN_MULTIPLIER: 0.93,// 每級冷卻時間乘數 (減少 7%)
+        SKILL_LINEAR2_DAMAGE_PER_LEVEL: 250,   // 每級增加傷害
+        SKILL_LINEAR2_COOLDOWN_MULTIPLIER: 0.97,// 每級冷卻時間乘數 (減少 7%)
         SKILL_LINEAR2_RANGE_PER_LEVEL: TILE_SIZE * 1.2, // 每級增加射程
-        // SKILL_LINEAR2_WIDTH_PER_LEVEL: TILE_SIZE * 0.08  // 可選：每級增加寬度
+        // SKILL_LINEAR2_WIDTH_PER_LEVEL: TILE_SIZE * 0.08,  // 可選：每級增加寬度
+
+        // --- 新增：技能信息 (用於 UI) ---
+        SKILLS_INFO: [
+            { index: 1, name: "震盪波", icon: "💥" },
+            { index: 2, name: "新星爆發", icon: "🌟" },
+            { index: 3, name: "能量箭", icon: "⚡" },
+            { index: 4, name: "能量光束", icon: "☄️" }
+        ]
     };
 })(); // IIFE 結束

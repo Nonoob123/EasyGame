@@ -67,30 +67,30 @@ export class Player extends Entity {
         // --- 初始化武器屬性 ---
         this.updateWeaponStats(); // 根據初始武器等級計算屬性
 
-        // --- 新增：自動技能冷卻計時器 ---
+        // --- 自動技能冷卻計時器 ---
         this.skillAoe1CooldownTimer = 0;
         this.skillAoe2CooldownTimer = 0;
         this.skillLinear1CooldownTimer = 0;
         this.skillLinear2CooldownTimer = 0;
 
-        // --- 新增：自動技能等級 ---
+        // --- 自動技能等級 ---
         this.skillAoe1Level = 0; // 震盪波等級
         this.skillAoe2Level = 0; // 新星爆發等級
-        this.skillLinear1Level = 0; // 能量箭等級
+        this.skillLinear1Level = 1; // 能量箭等級
         this.skillLinear2Level = 0; // 能量光束等級
     }
 
-    // --- 新增：計算下一級所需經驗 ---
+    // --- 計算下一級所需經驗 ---
     calculateXpToNextLevel(level) {
         return Math.floor(this.constants.PLAYER_XP_BASE_REQ * Math.pow(this.constants.PLAYER_XP_LEVEL_MULTIPLIER, level - 1));
     }
 
-    // --- 新增：計算當前等級的最大 HP ---
+    // --- 計算當前等級的最大 HP ---
     calculateMaxHp() {
         return this.baseMaxHp + (this.level - 1) * this.constants.PLAYER_HP_GAIN_PER_LEVEL;
     }
 
-    // --- 新增：處理經驗獲取 ---
+    // --- 處理經驗獲取 ---
     gainXp(amount, game) { // 需要 game 來顯示消息
         if (!this.active) return;
 
@@ -224,10 +224,16 @@ export class Player extends Entity {
         if (this.dashTimer > 0) this.dashTimer -= deltaTime;
         if (this.dashCooldownTimer > 0) this.dashCooldownTimer -= deltaTime;
         if (this.invincibilityTimer > 0) this.invincibilityTimer -= deltaTime;
-        // --- 新增：更新自動技能計時器 ---
+        // --- 更新自動技能計時器 ---
         if (this.skillAoe1CooldownTimer > 0) this.skillAoe1CooldownTimer -= deltaTime;
         if (this.skillAoe2CooldownTimer > 0) this.skillAoe2CooldownTimer -= deltaTime;
-        if (this.skillLinear1CooldownTimer > 0) this.skillLinear1CooldownTimer -= deltaTime;
+        let skill3TimerBeforeUpdate = this.skillLinear1CooldownTimer; // <--- 定義變量記錄更新前的值
+        let skill3TimerUpdated = false; // 標記計時器是否實際減少了
+
+        if (this.skillLinear1CooldownTimer > 0) {
+            this.skillLinear1CooldownTimer -= deltaTime;
+            skill3TimerUpdated = true; // 標記已更新
+        }      
         if (this.skillLinear2CooldownTimer > 0) this.skillLinear2CooldownTimer -= deltaTime;
 
 
@@ -238,7 +244,7 @@ export class Player extends Entity {
         this.dashTimer = Math.max(0, this.dashTimer);
         this.dashCooldownTimer = Math.max(0, this.dashCooldownTimer);
         this.invincibilityTimer = Math.max(0, this.invincibilityTimer);
-        // --- 新增：Clamp 自動技能計時器 ---
+        // --- Clamp 自動技能計時器 ---
         this.skillAoe1CooldownTimer = Math.max(0, this.skillAoe1CooldownTimer);
         this.skillAoe2CooldownTimer = Math.max(0, this.skillAoe2CooldownTimer);
         this.skillLinear1CooldownTimer = Math.max(0, this.skillLinear1CooldownTimer);
@@ -310,9 +316,9 @@ export class Player extends Entity {
         let inHealingRoom = game.healingRoom && simpleCollisionCheck(this, game.healingRoom);
         let inSkillInstitute = game.skillInstitute && simpleCollisionCheck(this, game.skillInstitute); // 新增研究所檢測
 
-        if (inWeaponShop) { // 改名
+        if (inWeaponShop) { 
             this.handleWeaponShopInteraction(game); // Attempt weapon upgrade (方法名也改一下)
-            let shopMsg = "在武器店！"; // 改名
+            let shopMsg = "在武器店！"; 
             if (this.weaponUpgradeCooldown > 0) {
                 // Optional: shopMsg += ` (冷卻: ...)`
             } else if (!this.bowUnlocked) {
@@ -352,17 +358,16 @@ export class Player extends Entity {
         }
 
         if (inSkillInstitute) {
-            this.handleSkillInstituteInteraction(game); // Attempt skill upgrade
-            let instituteMsg = "在研究所！";
-            if (this.skillPoints > 0) {
-                instituteMsg += ` (可用點數: ${this.skillPoints}🧬)`;
-                // 可選：顯示下一個可升級的技能和所需點數
-            } else {
-                instituteMsg += " (無可用技能點)";
-            }
-             if (game.messageTimer <= 0) game.setMessage(instituteMsg, 500);
-        }
-
+            if (this.skillPoints > 0 && this.weaponUpgradeCooldown <= 0) { // 檢查技能點和冷卻
+                // 使用持續時間稍長的消息，方便玩家看到按鍵提示
+                game.setMessage("按[1-4]學習/升級技能", 1000); // (原500ms可能太短)
+           } else if (this.skillPoints <= 0) {
+                game.setMessage("無可用技能點", 1000);
+           } else if (this.weaponUpgradeCooldown > 0) {
+                // 可選：如果希望顯示冷卻，可以取消註釋下一行
+                // game.setMessage(`技能升級冷卻中: ${(this.weaponUpgradeCooldown / 1000).toFixed(1)}s`, 500);
+           }
+       }
 
         // --- 自動攻擊 (需要 game.find...Enemy 方法) ---
         // 衝刺時不攻擊
@@ -371,7 +376,7 @@ export class Player extends Entity {
             this.attack(null, game); // Pass null target, method handles finding
         }
 
-        // --- 新增：自動技能觸發 ---
+        // --- 自動技能觸發 ---
         this.tryActivateAutoSkills(game);
     }
 
@@ -416,7 +421,7 @@ export class Player extends Entity {
         // --- 繪製無敵效果 (例如：閃爍或外框) ---
         if (this.isInvincible && !this.isDashing) { // 僅在非衝刺的無敵狀態下顯示，避免與衝刺效果重疊
              // 簡單的閃爍效果 (通過改變透明度)
-             const blinkSpeed = 150; // 閃爍速度 (毫秒)
+             const blinkSpeed = 250; // 閃爍速度 (毫秒)
              const alpha = (Math.sin(performance.now() / blinkSpeed) + 1) / 2 * 0.4 + 0.3; // Alpha between 0.3 and 0.7
              ctx.save();
              ctx.globalAlpha = alpha;
@@ -649,7 +654,7 @@ export class Player extends Entity {
         return collected;
     }
 
-    // --- 新增：觸發衝刺的方法 ---
+    // --- 觸發衝刺的方法 ---
     startDash(inputDx, inputDy) {
         // 檢查冷卻時間是否結束，以及是否已經在衝刺中
         if (this.dashCooldownTimer > 0 || this.isDashing) {
@@ -686,7 +691,84 @@ export class Player extends Entity {
         // game.addDashEffect(this);
     }
 
-    // --- 新增：計算技能屬性 ---
+    // --- 檢查是否可以升級指定技能 ---
+    canUpgradeSkill(skillIndex) {
+        if (this.skillPoints <= 0) return false; // 沒點數
+
+        let currentLevel;
+        switch (skillIndex) {
+            case 1: currentLevel = this.skillAoe1Level; break;
+            case 2: currentLevel = this.skillAoe2Level; break;
+            case 3: currentLevel = this.skillLinear1Level; break;
+            case 4: currentLevel = this.skillLinear2Level; break;
+            default: return false; // 無效索引
+        }
+        // 檢查是否達到最高等級
+        return currentLevel < this.constants.SKILL_MAX_LEVEL;
+    }
+
+    // --- 嘗試升級指定技能 ---
+    attemptSkillUpgrade(skillIndex, game) {
+        // 檢查冷卻時間，防止快速連續點擊
+        if (this.weaponUpgradeCooldown > 0) {
+             // game.setMessage(`技能升級冷卻中...`, 500); // 可選提示
+             return false;
+        }
+
+        if (!this.canUpgradeSkill(skillIndex)) {
+            // 檢查不能升級的原因
+            if (this.skillPoints <= 0) {
+                game.setMessage("沒有技能點！", 1500);
+            } else {
+                // 判斷是哪個技能已滿級
+                let skillName = "";
+                switch (skillIndex) {
+                    case 1: skillName = "震盪波"; break;
+                    case 2: skillName = "新星爆發"; break;
+                    case 3: skillName = "能量箭"; break;
+                    case 4: skillName = "能量光束"; break;
+                }
+                game.setMessage(`${skillName} 已達到最高等級!`, 1500);
+            }
+            return false; // 升級失敗
+        }
+
+        // --- 執行升級 ---
+        this.skillPoints--; // 消耗技能點
+        let skillName = "";
+        let newLevel = 0;
+
+        switch (skillIndex) {
+            case 1:
+                this.skillAoe1Level++;
+                skillName = "💥 震盪波";
+                newLevel = this.skillAoe1Level;
+                break;
+            case 2:
+                this.skillAoe2Level++;
+                skillName = "🌟 新星爆發";
+                newLevel = this.skillAoe2Level;
+                break;
+            case 3:
+                this.skillLinear1Level++;
+                skillName = "⚡ 能量箭";
+                newLevel = this.skillLinear1Level;
+                break;
+            case 4:
+                this.skillLinear2Level++;
+                skillName = "☄️ 能量光束";
+                newLevel = this.skillLinear2Level;
+                break;
+        }
+
+        // 設置短暫冷卻，防止誤觸
+        this.weaponUpgradeCooldown = 500; // 0.5秒冷卻
+
+        game.setMessage(`${skillName} 升級! Lv.${newLevel} (-1🧬)`, 1500);
+        return true; // 升級成功
+    }    
+
+    // --- 計算技能屬性 ---
     getSkillStats(skillIndex) {
         const constants = this.constants;
         let baseDamage, damagePerLevel, baseCooldown, cooldownMultiplier, baseRadius, radiusPerLevel, baseRange, rangePerLevel, baseWidth, widthPerLevel, currentLevel;
@@ -697,7 +779,7 @@ export class Player extends Entity {
                 baseDamage = constants.SKILL_AOE1_DAMAGE;
                 damagePerLevel = constants.SKILL_AOE1_DAMAGE_PER_LEVEL;
                 baseCooldown = constants.SKILL_AOE1_COOLDOWN;
-                cooldownMultiplier = constants.SKILL_AOE1_COOLDOWN_MULTIPLIER;
+                cooldownMultiplier = constants.SKILL_LINEAR1_COOLDOWN_MULTIPLIER;
                 baseRadius = constants.SKILL_AOE1_RADIUS;
                 radiusPerLevel = constants.SKILL_AOE1_RADIUS_PER_LEVEL;
                 break;
@@ -752,7 +834,7 @@ export class Player extends Entity {
         const cooldown = baseCooldown * (cooldownMultiplier ** levelFactor);
         const radius = baseRadius ? baseRadius + levelFactor * radiusPerLevel : undefined;
         const range = baseRange ? baseRange + levelFactor * rangePerLevel : undefined;
-        const width = baseWidth // ? baseWidth + levelFactor * widthPerLevel : undefined; // 寬度暫不升級
+        const width = baseWidth;
 
         return { level: currentLevel, damage, cooldown, radius, range, width };
     }
@@ -778,6 +860,11 @@ export class Player extends Entity {
 
         // 技能 3: 能量箭 (Bolt)
         const stats3 = this.getSkillStats(3);
+        // **** 添加日誌：檢查觸發條件 ****
+        if (stats3 && stats3.level > 0) {
+            // console.log(`Checking Skill 3 trigger: Level=${stats3.level}, Timer=${this.skillLinear1CooldownTimer.toFixed(0)}`);
+        }
+        // **** -------------------------- ****
         if (stats3 && stats3.level > 0 && this.skillLinear1CooldownTimer <= 0) {
             game.triggerSkillLinear1(this, stats3);
             this.skillLinear1CooldownTimer = stats3.cooldown;
@@ -785,56 +872,11 @@ export class Player extends Entity {
 
         // 技能 4: 能量光束 (Beam)
         const stats4 = this.getSkillStats(4);
+        // ... (類似地為技能4添加日誌，如果需要) ...
         if (stats4 && stats4.level > 0 && this.skillLinear2CooldownTimer <= 0) {
             game.triggerSkillLinear2(this, stats4);
             this.skillLinear2CooldownTimer = stats4.cooldown;
+            // console.log(`>>> Skill 4 Triggered! Cooldown set to: ${this.skillLinear2CooldownTimer.toFixed(0)}`);
         }
-    }
-
-    // --- 新增：處理研究所互動 (升級技能) ---
-    handleSkillInstituteInteraction(game) {
-        if (!game || !game.constants || this.skillPoints <= 0) return false; // 沒有技能點則無法升級
-
-        const constants = this.constants;
-        let upgradedSkill = false;
-
-        // 簡單邏輯：按順序嘗試升級第一個未滿級的技能
-        // TODO: 將來可以改成讓玩家選擇升級哪個技能 (需要 UI 互動)
-
-        // 嘗試升級技能 1
-        if (this.skillAoe1Level < constants.SKILL_MAX_LEVEL) {
-            this.skillAoe1Level++;
-            this.skillPoints--;
-            game.setMessage(`💥 震盪波升級! Lv.${this.skillAoe1Level} (-1🧬)`, 1500);
-            upgradedSkill = true;
-        }
-        // 嘗試升級技能 2
-        else if (this.skillAoe2Level < constants.SKILL_MAX_LEVEL) {
-            this.skillAoe2Level++;
-            this.skillPoints--;
-            game.setMessage(`🌟 新星爆發升級! Lv.${this.skillAoe2Level} (-1🧬)`, 1500);
-            upgradedSkill = true;
-        }
-        // 嘗試升級技能 3
-        else if (this.skillLinear1Level < constants.SKILL_MAX_LEVEL) {
-            this.skillLinear1Level++;
-            this.skillPoints--;
-            game.setMessage(`⚡ 能量箭升級! Lv.${this.skillLinear1Level} (-1🧬)`, 1500);
-            upgradedSkill = true;
-        }
-        // 嘗試升級技能 4
-        else if (this.skillLinear2Level < constants.SKILL_MAX_LEVEL) {
-            this.skillLinear2Level++;
-            this.skillPoints--;
-            game.setMessage(`☄️ 能量光束升級! Lv.${this.skillLinear2Level} (-1🧬)`, 1500);
-            upgradedSkill = true;
-        }
-
-        // 如果成功升級了任何技能，可以添加一個短暫的冷卻，防止連續升級
-        if (upgradedSkill) {
-            // this.weaponUpgradeCooldown = 500; // 可以共用武器升級冷卻或單獨設置
-        }
-
-        return upgradedSkill;
     }
 }

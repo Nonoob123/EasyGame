@@ -471,11 +471,11 @@ export class Game {
         this.trees.forEach(e => e.active && e.isRectInView(cam, visibleWidth, visibleHeight, leeway) && e.draw(this.ctx));
 
         // DEBUG LOGS for shop drawing (Uncommented for debugging)
-        console.log('--- Drawing Shops ---');
-        console.log('Trading Post Exists:', !!this.tradingPost, 'In View:', this.tradingPost ? this.tradingPost.isRectInView(cam, visibleWidth, visibleHeight, leeway) : 'N/A');
-        console.log('Weapon Shop Exists:', !!this.weaponShop, 'In View:', this.weaponShop ? this.weaponShop.isRectInView(cam, visibleWidth, visibleHeight, leeway) : 'N/A');
-        console.log('Healing Room Exists:', !!this.healingRoom, 'In View:', this.healingRoom ? this.healingRoom.isRectInView(cam, visibleWidth, visibleHeight, leeway) : 'N/A');
-        console.log('Skill Institute Exists:', !!this.skillInstitute, 'In View:', this.skillInstitute ? this.skillInstitute.isRectInView(cam, visibleWidth, visibleHeight, leeway) : 'N/A');
+        //console.log('--- Drawing Shops ---');
+        //console.log('Trading Post Exists:', !!this.tradingPost, 'In View:', this.tradingPost ? this.tradingPost.isRectInView(cam, visibleWidth, visibleHeight, leeway) : 'N/A');
+        //console.log('Weapon Shop Exists:', !!this.weaponShop, 'In View:', this.weaponShop ? this.weaponShop.isRectInView(cam, visibleWidth, visibleHeight, leeway) : 'N/A');
+        //console.log('Healing Room Exists:', !!this.healingRoom, 'In View:', this.healingRoom ? this.healingRoom.isRectInView(cam, visibleWidth, visibleHeight, leeway) : 'N/A');
+        //console.log('Skill Institute Exists:', !!this.skillInstitute, 'In View:', this.skillInstitute ? this.skillInstitute.isRectInView(cam, visibleWidth, visibleHeight, leeway) : 'N/A');
 
         // 繪製商店 (如果存在且在視圖內)
         if (this.tradingPost && this.tradingPost.isRectInView(cam, visibleWidth, visibleHeight, leeway)) this.tradingPost.draw(this.ctx, this);

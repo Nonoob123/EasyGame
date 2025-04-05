@@ -39,8 +39,7 @@ canvas {
 }
 
 /* 可以保留 #message 的樣式定義，雖然 game.js 會直接繪製 */
-#message {
+/* #message { */
     /* ... 如果需要 HTML 消息元素，可以在此添加樣式 ... */
-}
+/* } */
 
-/* 移除舊的 #ui 和 #build-info 樣式 (確認已移除) */

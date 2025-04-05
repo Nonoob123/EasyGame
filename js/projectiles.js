@@ -502,17 +502,24 @@ export class EnergyBolt extends Entity {
         }
 
         // --- 穿透碰撞檢測 ---
-        if (game.enemies && (this.shooter instanceof Player)) { // 僅玩家技能可穿透
+        if (game.enemies && (this.shooter instanceof Player)) {
             for (const enemy of game.enemies) {
-                if (!enemy.active || this.hitEnemies.has(enemy.id)) continue; // 跳過不活躍或已擊中的敵人
+                // 跳過不活躍的敵人，或者這個投射物已經擊中過的敵人
+                if (!enemy.active || this.hitEnemies.has(enemy.id)) { // <--- 檢查 hitEnemies
+                    continue;
+                }
 
-                // 使用 simpleCollisionCheck 進行碰撞檢測
+                // 進行碰撞檢測
                 if (simpleCollisionCheck(this, enemy)) {
                     const damageDealt = this.damage;
-                    enemy.takeDamage(damageDealt, game);
-                    game.addDamageNumber(enemy.centerX, enemy.y, damageDealt, this.color);
-                    this.hitEnemies.add(enemy.id); // 標記已擊中
-                    // 注意：不設置 this.active = false，允許穿透
+                    enemy.takeDamage(damageDealt, game); // 敵人受到傷害
+                    game.addDamageNumber(enemy.centerX, enemy.y, damageDealt, this.color); // 顯示傷害數字
+
+                    // 將敵人 ID 加入已擊中列表，防止重複傷害
+                    this.hitEnemies.add(enemy.id); // <--- 添加到 Set
+
+                    // **** 注意：這裡不再設置 this.active = false ****
+                    // 投射物會繼續飛行
                 }
             }
         }
@@ -546,7 +553,7 @@ export class EnergyBolt extends Entity {
 }
 
 
-// --- 新增：能量光束 (EnergyBeam) - 直線穿透投射物 ---
+// --- 能量光束 (EnergyBeam) - 直線穿透投射物 ---
 export class EnergyBeam extends Entity {
      /**
      * 創建一個能量光束實例。
@@ -608,14 +615,22 @@ export class EnergyBeam extends Entity {
         // --- 穿透碰撞檢測 ---
         if (game.enemies && (this.shooter instanceof Player)) {
             for (const enemy of game.enemies) {
-                if (!enemy.active || this.hitEnemies.has(enemy.id)) continue;
+                // 跳過不活躍的敵人，或者這個投射物已經擊中過的敵人
+                if (!enemy.active || this.hitEnemies.has(enemy.id)) { // <--- 檢查 hitEnemies
+                    continue;
+                }
 
-                // 使用 simpleCollisionCheck 進行碰撞檢測
+                // 進行碰撞檢測
                 if (simpleCollisionCheck(this, enemy)) {
                     const damageDealt = this.damage;
-                    enemy.takeDamage(damageDealt, game);
-                    game.addDamageNumber(enemy.centerX, enemy.y, damageDealt, this.color);
-                    this.hitEnemies.add(enemy.id);
+                    enemy.takeDamage(damageDealt, game); // 敵人受到傷害
+                    game.addDamageNumber(enemy.centerX, enemy.y, damageDealt, this.color); // 顯示傷害數字
+
+                    // 將敵人 ID 加入已擊中列表，防止重複傷害
+                    this.hitEnemies.add(enemy.id); // <--- 添加到 Set
+
+                    // **** 注意：這裡不再設置 this.active = false ****
+                    // 投射物會繼續飛行
                 }
             }
         }

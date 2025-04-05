@@ -7,6 +7,7 @@ import { distanceSq, distanceSqValues, simpleCollisionCheck } from './utils.js';
 // --- 敵人類 ---
 // 繼承自 Entity 類，代表遊戲中的敵人單位
 export class Enemy extends Entity {
+    static nextId = 0;
     /**
      * 創建一個敵人實例。
      * @param {number} x - 初始 X 座標
@@ -21,6 +22,7 @@ export class Enemy extends Entity {
     constructor(x, y, width, height, gameConstants, difficultyLevel, enemyType = 'normal', imageUrl = null) {
         // 調用父類構造函數，設置基礎屬性和顏色（根據類型）
         super(x, y, width, height, enemyType === 'boss' ? 'darkred' : (enemyType === 'mini-boss' ? 'purple' : 'saddlebrown'));
+        this.id = Enemy.nextId++;
         this.constants = gameConstants; // 保存常量引用
         this.difficultyLevel = difficultyLevel; // 保存難度等級
         this.enemyType = enemyType; // 保存敵人類型

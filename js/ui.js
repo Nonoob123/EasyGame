@@ -182,21 +182,27 @@ export function drawHUD(ctx, game) {
         ctx.fillText('就緒', dashCooldownTextX, dashCooldownTextY);
     }
 
-    // --- 新增：繪製自動技能冷卻 (Auto Skills Cooldown) ---
-    const skillStartY = dashSkillY + dashCooldownBarHeight + spacing; // 技能 UI 起始 Y 座標
+    // --- 繪製自動技能冷卻 (Auto Skills Cooldown) ---
+    const dashSkillBottomY = dashSkillY + dashCooldownBarHeight; // 計算衝刺技能UI的底部 Y
+    const skillStartY = dashSkillBottomY + spacing * 1.8;
     const skillIconSize = 20;
-    const skillBarWidth = 40;
-    const skillBarHeight = 8;
-    const skillSpacing = spacing * 0.6; // 技能之間的垂直間距
+    const skillBarWidth = 40; // 冷卻條寬度
+    const skillBarHeight = 8; // 冷卻條高度
+    const levelTextHeight = 12;
+    const skillElementHeight = skillIconSize;
+    const skillSpacing = spacing * 1.2;
 
     // 繪製技能 1 (震盪波)
     drawSkillCooldown(ctx, player, 'skillAoe1CooldownTimer', constants.SKILL_AOE1_COOLDOWN, '💥', hpBarX, skillStartY, skillIconSize, skillBarWidth, skillBarHeight, cornerRadius);
     // 繪製技能 2 (新星爆發)
-    drawSkillCooldown(ctx, player, 'skillAoe2CooldownTimer', constants.SKILL_AOE2_COOLDOWN, '🌟', hpBarX, skillStartY + skillIconSize + skillSpacing, skillIconSize, skillBarWidth, skillBarHeight, cornerRadius);
+    let nextSkillY = skillStartY + skillElementHeight + skillSpacing;
+    drawSkillCooldown(ctx, player, 'skillAoe2CooldownTimer', constants.SKILL_AOE2_COOLDOWN, '🌟', hpBarX, nextSkillY, skillIconSize, skillBarWidth, skillBarHeight, cornerRadius);
     // 繪製技能 3 (能量箭)
-    drawSkillCooldown(ctx, player, 'skillLinear1CooldownTimer', constants.SKILL_LINEAR1_COOLDOWN, '⚡', hpBarX, skillStartY + (skillIconSize + skillSpacing) * 2, skillIconSize, skillBarWidth, skillBarHeight, cornerRadius);
+    nextSkillY += skillElementHeight + skillSpacing + skillSpacing;
+    drawSkillCooldown(ctx, player, 'skillLinear1CooldownTimer', constants.SKILL_LINEAR1_COOLDOWN, '⚡', hpBarX, nextSkillY, skillIconSize, skillBarWidth, skillBarHeight, cornerRadius);
     // 繪製技能 4 (能量光束)
-    drawSkillCooldown(ctx, player, 'skillLinear2CooldownTimer', constants.SKILL_LINEAR2_COOLDOWN, '☄️', hpBarX, skillStartY + (skillIconSize + skillSpacing) * 3, skillIconSize, skillBarWidth, skillBarHeight, cornerRadius);
+    nextSkillY += skillElementHeight + skillSpacing + skillSpacing;
+    drawSkillCooldown(ctx, player, 'skillLinear2CooldownTimer', constants.SKILL_LINEAR2_COOLDOWN, '☄️', hpBarX, nextSkillY, skillIconSize, skillBarWidth, skillBarHeight, cornerRadius);
 
 
     // --- 繪製右上角信息 (Top Right Info) ---
@@ -303,82 +309,113 @@ export function drawMessages(ctx, game) {
  * @param {number} cornerRadius - 圓角半徑
  */
 function drawSkillCooldown(ctx, player, timerKey, maxCooldown, icon, startX, startY, iconSize, barWidth, barHeight, cornerRadius) {
-    // 從 timerKey 推斷 levelKey (例如 'skillAoe1CooldownTimer' -> 'skillAoe1Level')
     const levelKey = timerKey.replace('CooldownTimer', 'Level');
-    const currentLevel = player[levelKey] || 0; // 獲取當前技能等級，如果不存在則為 0
+    const currentLevel = player[levelKey] || 0;
     const cooldownTimer = player[timerKey];
-    const barX = startX + iconSize + 5; // 冷卻條 X 座標
-    const textX = barX + barWidth / 2; // 文字 X 座標
-    const textY = startY + barHeight / 2 + 1; // 文字 Y 座標
-    const levelTextY = startY + barHeight + 10; // 等級文字 Y 座標 (在下方)
 
-    // 繪製圖標 (如果技能已學習)
-    if (currentLevel > 0) {
+    // --- 計算佈局 ---
+    const iconCenterY = startY + iconSize / 2; // 圖標垂直中心
+    const levelPadding = 6; // 圖標和等級之間的間距
+    const cooldownPadding = 8; // 等級和冷卻條之間的間距
+
+    // 等級文字位置 (圖標右側, 垂直居中)
+    const levelTextX = startX + iconSize + levelPadding;
+    const levelTextY = iconCenterY;
+
+    // 先預設字體測量等級文字寬度，以便定位冷卻條
+    ctx.font = `bold 12px 'Nunito', sans-serif`; // 使用預期的等級字體
+    const levelTextString = `Lv.${currentLevel > 0 ? currentLevel : 0}`;
+    const levelTextMetrics = ctx.measureText(levelTextString);
+    const levelTextWidth = levelTextMetrics.width;
+
+    // 冷卻條位置 (等級文字右側, 垂直居中)
+    const barX = levelTextX + levelTextWidth + cooldownPadding;
+    // 讓冷卻條的垂直中心與圖標中心對齊
+    const barY = iconCenterY - barHeight / 2;
+
+    // 冷卻條內文字位置 (條內水平居中, 垂直居中)
+    const cooldownTextX = barX + barWidth / 2;
+    const cooldownTextY = barY + barHeight / 2 + 1; // 微調垂直位置
+
+    // --- 繪製圖標 ---
+    ctx.save(); // 保存狀態用於繪製圖標
+    try {
         ctx.font = `${iconSize}px sans-serif`;
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(icon, startX, startY + barHeight / 2); // 垂直居中對齊冷卻條
-    } else {
-        // 如果未學習，可以顯示灰色圖標或不顯示
-        ctx.save();
-        ctx.globalAlpha = 0.4;
-        ctx.font = `${iconSize}px sans-serif`;
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(icon, startX, startY + barHeight / 2);
-        ctx.restore();
-    }
-
-
-    // 繪製冷卻條背景 (僅當技能已學習)
-    if (currentLevel > 0) {
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    drawRoundedRect(ctx, barX - 1, startY - 1, barWidth + 2, barHeight + 2, cornerRadius * 0.5);
-        // 繪製冷卻條底色
-        ctx.fillStyle = '#555';
-        drawRoundedRect(ctx, barX, startY, barWidth, barHeight, cornerRadius * 0.5);
-
-        // 繪製冷卻進度
-        const stats = player.getSkillStats(parseInt(timerKey.match(/\d+/)[0])); // 獲取計算後的屬性
-        const actualMaxCooldown = stats ? stats.cooldown : maxCooldown; // 使用計算後的冷卻時間
-
-        if (cooldownTimer > 0 && actualMaxCooldown > 0 && actualMaxCooldown !== Infinity) {
-            const cooldownRatio = 1 - (cooldownTimer / actualMaxCooldown);
-            const progressWidth = barWidth * cooldownRatio;
-            if (progressWidth > 0) {
-                ctx.fillStyle = '#a78bfa'; // 紫色表示可用進度
-                drawRoundedRect(ctx, barX, startY, progressWidth, barHeight, cornerRadius * 0.5, true, cooldownRatio < 1);
-            }
-            // 繪製冷卻時間文字
-            ctx.fillStyle = 'white';
-            ctx.font = `bold ${barHeight * 0.8}px 'Nunito', sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(`${(cooldownTimer / 1000).toFixed(1)}`, textX, textY);
-        } else {
-            // 如果冷卻完成，填滿進度條
-            ctx.fillStyle = '#a78bfa'; // 填滿表示可用
-            drawRoundedRect(ctx, barX, startY, barWidth, barHeight, cornerRadius * 0.5);
-            // 可選：顯示 "Ready" 或不顯示文字
-            // ctx.fillStyle = 'white';
-            // ctx.font = `bold ${barHeight * 0.8}px 'Nunito', sans-serif`;
-            // ctx.textAlign = 'center';
-            // ctx.textBaseline = 'middle';
-            // ctx.fillText('OK', textX, textY);
-        }
-
-        // 繪製技能等級文字 (如果已學習)
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        ctx.font = `bold 10px 'Nunito', sans-serif`;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
-        ctx.fillText(`Lv.${currentLevel}`, startX, levelTextY);
-    } else {
-         // 如果未學習，可以顯示 "未學習" 或灰色文字
-         ctx.fillStyle = 'rgba(150, 150, 150, 0.7)';
-         ctx.font = `bold 10px 'Nunito', sans-serif`;
-         ctx.textAlign = 'left';
-         ctx.textBaseline = 'top';
-         ctx.fillText(`Lv.0`, startX, levelTextY);
+        if (currentLevel > 0) ctx.globalAlpha = 1.0;
+        else ctx.globalAlpha = 0.4;
+        ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 3;
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 1;
+        ctx.fillText(icon, startX, startY);
+    } finally { ctx.restore(); }
+
+    // --- 繪製技能等級文字 ---
+    ctx.save();
+    try {
+        ctx.font = `bold 12px 'Nunito', sans-serif`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = 'rgba(0,0,0,0.8)';
+        ctx.shadowBlur = 2;
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 1;
+        if (currentLevel > 0) ctx.fillStyle = '#FFFFFF';
+        else ctx.fillStyle = 'rgba(200, 200, 200, 0.8)';
+        ctx.fillText(`Lv.${currentLevel > 0 ? currentLevel : 0}`, levelTextX, levelTextY);
+    } finally { ctx.restore(); }
+
+    // --- 繪製冷卻條背景 (始終繪製) ---
+    ctx.save();
+    try {
+        ctx.shadowColor = 'transparent'; // 清除陰影
+        // 繪製背景框
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        drawRoundedRect(ctx, barX - 1, barY - 1, barWidth + 2, barHeight + 2, cornerRadius * 0.5);
+        // 繪製底色 (灰色)
+        ctx.fillStyle = '#555';
+        drawRoundedRect(ctx, barX, barY, barWidth, barHeight, cornerRadius * 0.5);
+
+        // --- 繪製冷卻進度和時間 (僅當技能已學習) ---
+        if (currentLevel > 0) {
+            const stats = player.getSkillStats(parseInt(timerKey.match(/\d+/)[0]));
+            const actualMaxCooldown = stats ? stats.cooldown : maxCooldown;
+
+            if (cooldownTimer > 0 && actualMaxCooldown > 0 && actualMaxCooldown !== Infinity) {
+                // 繪製進度
+                const cooldownRatio = 1 - (cooldownTimer / actualMaxCooldown);
+                const progressWidth = barWidth * cooldownRatio;
+                if (progressWidth > 0) {
+                    ctx.fillStyle = '#a78bfa'; // 進度條顏色
+                    drawRoundedRect(ctx, barX, barY, progressWidth, barHeight, cornerRadius * 0.5, true, cooldownRatio < 1);
+                }
+                // 繪製冷卻時間數字
+                ctx.fillStyle = 'white';
+                ctx.font = `bold ${barHeight * 0.9}px 'Nunito', sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`${(cooldownTimer / 1000).toFixed(1)}`, cooldownTextX, cooldownTextY);
+            } else {
+                // 冷卻完成，顯示就緒狀態
+                ctx.fillStyle = '#a78bfa'; // 填滿顏色
+                drawRoundedRect(ctx, barX, barY, barWidth, barHeight, cornerRadius * 0.5);
+                ctx.fillStyle = 'white'; // 白色文字
+                ctx.font = `bold ${barHeight * 0.85}px 'Nunito', sans-serif`; // 調整字體大小
+                ctx.textAlign = 'center';   // 居中
+                ctx.textBaseline = 'middle'; // 垂直居中
+                ctx.fillText('就緒', cooldownTextX, cooldownTextY);            
+            }
+        }
+        // --- 如果未學習，可以在灰色底條上顯示 '未學習' 或鎖圖標 (可選) ---
+        // else {
+        //     ctx.fillStyle = 'rgba(200, 200, 200, 0.6)';
+        //     ctx.font = `bold ${barHeight * 0.8}px 'Nunito', sans-serif`;
+        //     ctx.textAlign = 'center';
+        //     ctx.textBaseline = 'middle';
+        //     ctx.fillText('🔒', cooldownTextX, cooldownTextY); // 或 'N/A'
+        // }
+    } finally {
+        ctx.restore();
     }
-}
+} // 結束 drawSkillCooldown 函數

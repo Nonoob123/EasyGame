@@ -1,4 +1,5 @@
 'use strict';
+import { simpleCollisionCheck } from './utils.js';
 
 // --- 輸入處理器類 ---
 // 負責監聽和處理用戶的鍵盤和滑鼠輸入事件
@@ -61,7 +62,7 @@ export class InputHandler {
 
        const key = event.key.toLowerCase(); // 將按鍵轉換為小寫
        this.keysPressed[key] = true; // 標記該鍵被按下
-       this.game.keysPressed[key] = true; // 同步更新 game 對象中的按鍵狀態 (方便 Player 等直接訪問)
+       if(this.game.keysPressed) this.game.keysPressed[key] = true;
 
        // --- 特定按鍵的動作 ---
        // 空格鍵：觸發衝刺
@@ -82,7 +83,17 @@ export class InputHandler {
              this.game.player.collectTree(this.game); // 嘗試砍樹
              // 未來可以加入其他交互，例如開門、拾取等
         }
-
+        // **** 處理技能升級按鍵 ****
+        else if (['1', '2', '3', '4'].includes(key) && this.game.player && this.game.skillInstitute) {
+            // 檢查是否在研究所範圍內
+            const player = this.game.player;
+            const institute = this.game.skillInstitute;
+            if (simpleCollisionCheck(player, institute)) {
+                event.preventDefault(); // 阻止數字鍵的默認行為 (例如輸入到地址欄)
+                const skillIndex = parseInt(key); // 將按鍵 '1'...'4' 轉換為數字 1...4
+                player.attemptSkillUpgrade(skillIndex, this.game); // 調用玩家的嘗試升級方法
+            }
+       }
 
         // 阻止方向鍵和 WASD 的默認滾動行為 (當遊戲運行時)
         if (this.game.gameRunning && ['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd', ' '].includes(key)) { // 加入空格鍵
@@ -97,7 +108,7 @@ export class InputHandler {
     _handleKeyUp(event) {
         const key = event.key.toLowerCase(); // 將按鍵轉換為小寫
         this.keysPressed[key] = false; // 標記該鍵已釋放
-        this.game.keysPressed[key] = false; // 同步更新 game 對象中的按鍵狀態
+        if(this.game.keysPressed) this.game.keysPressed[key] = false;
     }
 
     /**
