@@ -216,8 +216,9 @@ export class DamageNumber {
         ctx.shadowOffsetY = 1; // 陰影垂直偏移
         ctx.shadowBlur = 2; // 陰影模糊度
 
-        // 繪製傷害數字（顯示整數）
-        ctx.fillText(Math.round(this.amount), this.x, this.y);
+        // 繪製傷害數字或文字
+        const displayText = typeof this.amount === 'number' ? Math.round(this.amount) : this.amount;
+        ctx.fillText(displayText, this.x, this.y);
 
         // 恢復之前的繪圖狀態（移除陰影、透明度等設置）
         ctx.restore();

@@ -1,43 +1,55 @@
 'use strict';
 
-import { Entity } from './entity.js'; // 導入基礎實體類
+// import { Entity } from './entity.js'; // Entity 由 Structure 導入，這裡不再需要
+import { Structure } from './structureBase.js'; // 從新的基礎文件導入 Structure
+import { Shop } from './shop.js'; // 導入商店類，因為 ArmorShop 和 DanceStudio 將繼承它
 // 防禦塔需要訪問 game.addBullet, game.findNearestActiveEnemy
 // 這些將通過 update 方法傳遞
 
-// --- 建築基類 (Structure Base Class) ---
-// 所有靜態建築物的基礎，如圍欄、塔、商店
-export class Structure extends Entity {
+// --- 移除本地的 Structure 定義 ---
+
+
+// --- 防具店類 (Armor Shop Class) ---
+// 現在繼承自 Shop 以使用統一的繪圖和交互邏輯
+export class ArmorShop extends Shop {
     /**
-     * 創建一個建築實例。
+     * 創建一個防具店實例。
      * @param {number} x - X 座標。
      * @param {number} y - Y 座標。
      * @param {number} width - 寬度。
      * @param {number} height - 高度。
-     * @param {string} color - 顏色。
-     * @param {number} [hp=Infinity] - 生命值 (預設為無限，表示不可摧毀)。
+     * @param {object} gameConstants - 遊戲常數 (Shop 構造函數不需要，但保留以防萬一)。
      */
-    constructor(x, y, width, height, color, hp = Infinity) {
-        super(x, y, width, height, color); // 調用父類構造函數
-        this.hp = hp; // 當前生命值
-        this.maxHp = hp; // 最大生命值
+    constructor(x, y, width, height, gameConstants) {
+        // 調用 Shop 的構造函數，傳入類型 'armor_shop' 和顏色
+        super(x, y, width, height, '#8B8B7A', 'armor_shop'); // 顏色: DarkSlateGray
+        // this.constants = gameConstants; // Shop 基類不需要直接訪問 constants
+        // 移除特定於舊實現的屬性 (maxLevel, interactionRadius, name, description)
+        // 這些現在由 Shop 的 draw 和 Player 的互動邏輯處理
     }
+    // 移除 getUpgradeCost, getHpIncreaseForLevel, updateDescription, upgradePlayer, draw 方法
+    // 這些方法的功能現在由 Shop.draw 和 Player.handleArmorShopInteraction 處理
+}
 
+// --- 舞蹈室類 (Dance Studio Class) ---
+// 現在繼承自 Shop 以使用統一的繪圖和交互邏輯
+export class DanceStudio extends Shop {
     /**
-     * 使建築受到傷害。
-     * @param {number} damage - 受到的傷害量。
+     * 創建一個舞蹈室實例。
+     * @param {number} x - X 座標。
+     * @param {number} y - Y 座標。
+     * @param {number} width - 寬度。
+     * @param {number} height - 高度。
+     * @param {object} gameConstants - 遊戲常數 (Shop 構造函數不需要)。
      */
-    takeDamage(damage) {
-        // 如果建築不活躍或是無限生命值，則不受傷害
-        if (!this.active || this.hp === Infinity) return;
-        this.hp -= damage; // 扣除生命值
-        if (this.hp <= 0) {
-            this.active = false; // 生命值歸零，設為不活躍
-            // 可選: 如果需要，可以通過 game 對象在此處播放摧毀效果或聲音
-        }
+    constructor(x, y, width, height, gameConstants) {
+        // 調用 Shop 的構造函數，傳入類型 'dance_studio' 和顏色
+        super(x, y, width, height, '#FFC0CB', 'dance_studio'); // 顏色: Pink
+        // this.constants = gameConstants; // Shop 基類不需要
+        // 移除特定於舊實現的屬性
     }
-
-     // 如果需要自定義繪製，可以覆蓋 draw 方法，但基礎 Entity 的 draw 可能已足夠
-     // draw(ctx) { super.draw(ctx); }
+    // 移除 getUpgradeCost, getTotalDodgeBonusForLevel, updateDescription, upgradePlayer, draw 方法
+    // 這些方法的功能現在由 Shop.draw 和 Player.handleDanceStudioInteraction 處理
 }
 
 // --- 圍欄類 (Fence Class) ---

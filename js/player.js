@@ -18,9 +18,9 @@ export class Player extends Entity {
         this.baseMaxHp = this.constants.PLAYER_HP_BASE; // 儲存基礎 HP
         this.maxHp = this.calculateMaxHp(); // 計算初始 MaxHP
         this.hp = this.maxHp; // 初始血量設為最大值
-        this.skillPoints = 0; // 初始技能點數
+        this.skillPoints = 1; // 初始技能點數
 
-        this.wood = 20;
+        this.wood = 0;
         this.diamond = 0;
         this.gold = 250; // 初始金幣
         this.attackTimer = 0;
@@ -76,8 +76,67 @@ export class Player extends Entity {
         // --- 自動技能等級 ---
         this.skillAoe1Level = 0; // 震盪波等級
         this.skillAoe2Level = 0; // 新星爆發等級
-        this.skillLinear1Level = 1; // 能量箭等級
+        this.skillLinear1Level = 0; // 能量箭等級
         this.skillLinear2Level = 0; // 能量光束等級
+
+        // --- 閃避屬性 ---
+        this.dodgeChance = 0; // 初始閃避機率為 0
+
+        // --- 商店升級等級 ---
+        this.armorLevel = 0; // 防具店提供的生命加成等級
+        this.danceLevel = 0; // 舞蹈室提供的閃避加成等級
+        this.hasMetGoalCharacter = false; // 是否已觸碰目標角色
+
+        // --- 重新計算初始屬性 ---
+        this.recalculateStats(); // 包含 HP 和閃避
+
+        // --- 獎杯攜帶狀態 ---
+        this.carryingTrophy = false; // 是否正在攜帶獎杯
+        this.trophyReference = null; // 對攜帶的獎杯物件的引用
+    }
+
+    // --- 重新計算所有基於等級的屬性 ---
+    recalculateStats() {
+        this.maxHp = this.calculateMaxHp();
+        // 確保當前 HP 不超過新的 maxHp
+        this.hp = Math.min(this.hp, this.maxHp);
+        this.dodgeChance = this.calculateDodgeChance();
+        this.updateWeaponStats(); // 武器屬性也可能受等級影響
+        // console.log(`Stats Recalculated: MaxHP=${this.maxHp}, Dodge=${(this.dodgeChance * 100).toFixed(1)}%`);
+    }
+
+    // --- 計算來自防具店的 HP 加成 ---
+    calculateArmorHpBonus() {
+        if (this.armorLevel <= 0) return 0;
+        const constants = this.constants;
+        let totalBonus = 0;
+        // 累加每級的遞增獎勵
+        for (let i = 1; i <= this.armorLevel; i++) {
+            totalBonus += constants.ARMOR_SHOP_BASE_HP_BONUS + (i - 1) * constants.ARMOR_SHOP_HP_BONUS_INCREMENT;
+        }
+        return totalBonus;
+        // 或者直接計算總和公式:
+        // return this.armorLevel * constants.ARMOR_SHOP_BASE_HP_BONUS +
+        //        constants.ARMOR_SHOP_HP_BONUS_INCREMENT * this.armorLevel * (this.armorLevel - 1) / 2;
+
+    }
+
+    // --- 計算來自舞蹈室的閃避加成 ---
+    calculateDanceDodgeBonus() {
+        if (this.danceLevel <= 0) return 0;
+        const constants = this.constants;
+        // 從預計算的數組中獲取總加成
+        // 確保等級不超過數組範圍
+        const levelIndex = Math.min(this.danceLevel, constants.DANCE_STUDIO_DODGE_BONUS_PER_LEVEL.length - 1);
+        return constants.DANCE_STUDIO_DODGE_BONUS_PER_LEVEL[levelIndex];
+    }
+
+    // --- 計算總閃避機率 ---
+    calculateDodgeChance() {
+        const baseDodge = this.constants.PLAYER_BASE_DODGE_CHANCE || 0; // 獲取基礎閃避 (如果定義了)
+        const danceBonus = this.calculateDanceDodgeBonus();
+        // 閃避率疊加，但不超過某個硬上限 (例如 90%)
+        return Math.min(0.9, baseDodge + danceBonus);
     }
 
     // --- 計算下一級所需經驗 ---
@@ -85,9 +144,11 @@ export class Player extends Entity {
         return Math.floor(this.constants.PLAYER_XP_BASE_REQ * Math.pow(this.constants.PLAYER_XP_LEVEL_MULTIPLIER, level - 1));
     }
 
-    // --- 計算當前等級的最大 HP ---
+    // --- 計算當前等級的最大 HP (包含等級和防具店加成) ---
     calculateMaxHp() {
-        return this.baseMaxHp + (this.level - 1) * this.constants.PLAYER_HP_GAIN_PER_LEVEL;
+        const levelHpBonus = (this.level - 1) * this.constants.PLAYER_HP_GAIN_PER_LEVEL;
+        const armorHpBonus = this.calculateArmorHpBonus();
+        return this.constants.PLAYER_HP_BASE + levelHpBonus + armorHpBonus;
     }
 
     // --- 處理經驗獲取 ---
@@ -113,7 +174,8 @@ export class Player extends Entity {
         this.hp += actualHpGain;
         this.hp = Math.min(this.hp, this.maxHp);
         this.xpToNextLevel = this.calculateXpToNextLevel(this.level);
-        this.updateWeaponStats();
+        // this.updateWeaponStats(); // recalculateStats 會調用它
+        this.recalculateStats(); // 升級後重新計算所有屬性
         game.setMessage(`等級提升! Lv.${this.level}`, 2500);
     }
 
@@ -312,11 +374,13 @@ export class Player extends Entity {
         }
 
         // --- 建築互動提示 ---
-        let inWeaponShop = game.weaponShop && simpleCollisionCheck(this, game.weaponShop); // 改名
+        let inWeaponShop = game.weaponShop && simpleCollisionCheck(this, game.weaponShop);
         let inHealingRoom = game.healingRoom && simpleCollisionCheck(this, game.healingRoom);
-        let inSkillInstitute = game.skillInstitute && simpleCollisionCheck(this, game.skillInstitute); // 新增研究所檢測
+        let inSkillInstitute = game.skillInstitute && simpleCollisionCheck(this, game.skillInstitute);
+        let inArmorShop = game.armorShop && simpleCollisionCheck(this, game.armorShop); // 新增防具店檢測
+        let inDanceStudio = game.danceStudio && simpleCollisionCheck(this, game.danceStudio); // 新增舞蹈室檢測
 
-        if (inWeaponShop) { 
+        if (inWeaponShop) {
             this.handleWeaponShopInteraction(game); // Attempt weapon upgrade (方法名也改一下)
             let shopMsg = "在武器店！"; 
             if (this.weaponUpgradeCooldown > 0) {
@@ -357,11 +421,58 @@ export class Player extends Entity {
             }
         }
 
+        if (inArmorShop) { // 防具店互動處理
+            const upgraded = this.handleArmorShopInteraction(game);
+            if (!upgraded) { // 僅在未成功升級時顯示提示
+                let armorMsg = "在防具店！";
+                if (this.armorLevel >= this.constants.ARMOR_SHOP_MAX_LEVEL) {
+                    armorMsg = "護甲已滿級！";
+                } else if (this.weaponUpgradeCooldown > 0) {
+                    // 可選：顯示冷卻提示
+                    // armorMsg = `升級冷卻中: ${(this.weaponUpgradeCooldown / 1000).toFixed(1)}s`;
+                } else {
+                    const cost = Math.floor(this.constants.ARMOR_SHOP_BASE_COST * (this.constants.ARMOR_SHOP_COST_MULTIPLIER ** this.armorLevel));
+                    const hpBonusNextLevel = this.constants.ARMOR_SHOP_BASE_HP_BONUS + this.armorLevel * this.constants.ARMOR_SHOP_HP_BONUS_INCREMENT;
+                    armorMsg += ` 🩸 Lv.${this.armorLevel + 1} (+${hpBonusNextLevel}HP): ${cost}G`;
+                    if (this.gold < cost) armorMsg += " - 金幣不足";
+                }
+                 // 僅在有具體信息或無其他消息時顯示
+                if (armorMsg !== "在防具店！" || game.messageTimer <= 0) {
+                    game.setMessage(armorMsg, armorMsg !== "在防具店！" ? 1000 : 500);
+                }
+            }
+        }
+
+        if (inDanceStudio) { // 新增舞蹈室互動處理
+            const upgraded = this.handleDanceStudioInteraction(game);
+             if (!upgraded) { // 僅在未成功升級時顯示提示
+                let danceMsg = "在舞蹈室！";
+                if (this.danceLevel >= this.constants.DANCE_STUDIO_MAX_LEVEL) {
+                    danceMsg = "閃避已滿級！";
+                } else if (this.weaponUpgradeCooldown > 0) {
+                     // 可選：顯示冷卻提示
+                     // danceMsg = `升級冷卻中: ${(this.weaponUpgradeCooldown / 1000).toFixed(1)}s`;
+                } else {
+                    const cost = Math.floor(this.constants.DANCE_STUDIO_BASE_COST * (this.constants.DANCE_STUDIO_COST_MULTIPLIER ** this.danceLevel));
+                    const currentTotalBonus = this.constants.DANCE_STUDIO_DODGE_BONUS_PER_LEVEL[this.danceLevel];
+                    const nextTotalBonus = this.constants.DANCE_STUDIO_DODGE_BONUS_PER_LEVEL[this.danceLevel + 1];
+                    const dodgeIncrease = nextTotalBonus - currentTotalBonus;
+                    danceMsg += ` 🤸 Lv.${this.danceLevel + 1} (+${(dodgeIncrease * 100).toFixed(1)}%閃避): ${cost}G`;
+                    if (this.gold < cost) danceMsg += " - 金幣不足";
+                }
+                 // 僅在有具體信息或無其他消息時顯示
+                if (danceMsg !== "在舞蹈室！" || game.messageTimer <= 0) {
+                    game.setMessage(danceMsg, danceMsg !== "在舞蹈室！" ? 1000 : 500);
+                }
+            }
+        }
+
+
         if (inSkillInstitute) {
             if (this.skillPoints > 0 && this.weaponUpgradeCooldown <= 0) { // 檢查技能點和冷卻
                 // 使用持續時間稍長的消息，方便玩家看到按鍵提示
                 game.setMessage("按[1-4]學習/升級技能", 1000); // (原500ms可能太短)
-           } else if (this.skillPoints <= 0) {
+            } else if (this.skillPoints <= 0) {
                 game.setMessage("無可用技能點", 1000);
            } else if (this.weaponUpgradeCooldown > 0) {
                 // 可選：如果希望顯示冷卻，可以取消註釋下一行
@@ -378,6 +489,17 @@ export class Player extends Entity {
 
         // --- 自動技能觸發 ---
         this.tryActivateAutoSkills(game);
+
+        // --- 拾取獎杯邏輯 ---
+        if (game.goalCharacter && game.goalCharacter.active && !this.carryingTrophy && simpleCollisionCheck(this, game.goalCharacter)) {
+            game.goalCharacter.pickUp();
+            this.carryingTrophy = true;
+            this.trophyReference = game.goalCharacter;
+            game.setMessage("撿到了獎杯！🏆 帶回安全區！", 3000);
+            // 標記玩家已觸碰過目標角色 (用於 HUD 顯示)
+            // 注意：這裡假設 goalCharacter 就是獎杯，所以直接設置 hasMetGoalCharacter
+            this.hasMetGoalCharacter = true;
+        }
     }
 
     draw(ctx) {
@@ -443,6 +565,28 @@ export class Player extends Entity {
              ctx.restore();
         }
 
+        // --- 繪製攜帶的獎杯 ---
+        if (this.carryingTrophy && this.trophyReference) {
+            ctx.save();
+            const iconSize = this.width * 0.6; // 獎杯圖標大小
+            const iconX = this.centerX;
+            // 計算跳動效果，使獎杯跟隨玩家頭頂跳動
+            const bobAmplitude = 2;
+            const bobFrequency = 180;
+            const bobOffset = this.isMoving ? Math.sin(this.bobbingTimer / bobFrequency) * bobAmplitude : 0;
+            const iconY = this.y + bobOffset - iconSize * 0.8; // 在頭頂上方一點，並應用跳動
+
+            ctx.font = `${iconSize}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            // 添加陰影
+            ctx.shadowColor = 'rgba(0,0,0,0.6)';
+            ctx.shadowOffsetX = 1;
+            ctx.shadowOffsetY = 1;
+            ctx.shadowBlur = 3;
+            ctx.fillText(this.trophyReference.icon, iconX, iconY);
+            ctx.restore();
+        }
 
         // Draw attack range (optional)
         if (this.attackRange > 0) {
@@ -469,11 +613,32 @@ export class Player extends Entity {
 
         if (isInSafeZone) return; // 安全區內不受傷害
 
+        // --- 閃避判定 ---
+        if (Math.random() < this.dodgeChance) {
+            // 觸發閃避
+            game.addDamageNumber(this.centerX, this.y, 'Miss', '#00FFFF'); // 顯示 "Miss" 文字，使用青色
+            // console.log("玩家閃避了攻擊！"); // 可以保留或移除日誌
+            return; // 不受到傷害，直接返回
+        }
+
+        // --- 未閃避，受到傷害 ---
         this.hp -= damage;
         this.hp = Math.max(0, this.hp); // 確保 HP 不會低於 0
 
-        // Damage number display is handled by the entity *dealing* the damage (e.g., Enemy.update or Bullet.update)
-        // No need to call game.addDamageNumber here for damage *taken* by the player.
+        // 在這裡添加傷害數字顯示，因為確定受到傷害了
+        game.addDamageNumber(this.centerX, this.y, damage, '#FF8888'); // 使用淡紅色表示玩家受到的傷害
+
+        // --- 檢查玩家是否死亡 ---
+        if (this.hp <= 0) {
+            // 如果攜帶獎杯，則掉落
+            if (this.carryingTrophy && this.trophyReference) {
+                this.trophyReference.drop(this.x, this.y); // 在玩家死亡位置掉落
+                this.carryingTrophy = false;
+                this.trophyReference = null;
+                game.setMessage("你倒下了，獎杯掉落了！", 3000);
+            }
+            // 可以在這裡觸發遊戲結束邏輯，或者由 Game 類檢測玩家 HP
+        }
     }
 
     tradeDiamond(game) { // Needs game for constants, setMessage
@@ -545,23 +710,96 @@ export class Player extends Entity {
 
 
     handleHealingRoomInteraction(game) { // Needs game for constants, setMessage
-         if (this.healingCooldown > 0 || !game || !game.constants) return false; // Cooldown or no game
-         if (this.hp >= this.maxHp) return false; // Full health
+         if (this.healingCooldown > 0 || !game || !game.constants) return false; // 冷卻中或缺少遊戲對象
+         if (this.hp >= this.maxHp) return false; // 生命值已滿
 
-         const healAmount = 10;
-         const goldCost = healAmount * this.constants.HEALING_COST_PER_HP;
+         // 計算補滿所需 HP 和金幣
+         const hpToHeal = Math.max(0, this.maxHp - this.hp);
+         // 使用 Math.ceil 確保即使只差一點點 HP 也要支付對應的最小金幣單位 (如果 costPerHp 不是整數)
+         const costToFull = Math.ceil(hpToHeal * this.constants.HEALING_COST_PER_HP);
 
-         if (this.gold < goldCost) return false; // Not enough gold
+         // 檢查金幣是否足夠
+         if (this.gold < costToFull) return false; // 金幣不足
 
-         // Perform healing
-         this.gold -= goldCost;
-         this.hp += healAmount;
-         this.hp = Math.min(this.hp, this.maxHp); // Cap at max HP
-         this.healingCooldown = this.constants.HEALING_RATE; // Start cooldown
+         // 執行治療 (補滿)
+         this.gold -= costToFull;
+         const actualHealed = this.maxHp - this.hp; // 記錄實際恢復量
+         this.hp = this.maxHp; // 直接補滿
+         this.healingCooldown = this.constants.HEALING_RATE; // 開始冷卻
 
-         game.setMessage(`+${healAmount} HP (花費 ${goldCost}G)`, 1000);
-         return true; // Healing was successful
-     }
+         game.setMessage(`+${Math.ceil(actualHealed)} HP (花費 ${costToFull}G)`, 1000); // 顯示實際恢復量和花費
+        return true; // Healing was successful
+    }
+
+    // --- 處理防具店互動 ---
+    handleArmorShopInteraction(game) {
+        const constants = this.constants;
+        // 檢查冷卻、遊戲對象、等級上限
+        if (this.weaponUpgradeCooldown > 0 || !game || !constants || this.armorLevel >= constants.ARMOR_SHOP_MAX_LEVEL) {
+            return false;
+        }
+
+        // 計算成本
+        const cost = Math.floor(constants.ARMOR_SHOP_BASE_COST * (constants.ARMOR_SHOP_COST_MULTIPLIER ** this.armorLevel));
+
+        // 檢查金幣
+        if (this.gold < cost) {
+            return false;
+        }
+
+        // 執行升級
+        this.gold -= cost;
+        this.armorLevel++;
+        const oldMaxHp = this.maxHp; // 記錄舊的最大 HP
+        this.recalculateStats(); // 重新計算 MaxHP (以及其他屬性)
+        const maxHpIncrease = this.maxHp - oldMaxHp; // 計算最大 HP 的實際增加量
+
+        // 同時增加當前 HP
+        if (maxHpIncrease > 0) {
+            this.hp += maxHpIncrease;
+            // 確保當前 HP 不超過新的最大值 (雖然 recalculateStats 裡可能已處理，但再次確認更安全)
+            this.hp = Math.min(this.hp, this.maxHp);
+        }
+
+        this.weaponUpgradeCooldown = constants.WEAPON_UPGRADE_COOLDOWN; // 設置冷卻
+
+        // 顯示消息時，顯示本次升級增加的 *總* HP 加成量可能更直觀
+        const totalHpBonus = this.calculateArmorHpBonus(); // 獲取升級後的總加成
+        game.setMessage(`🩸 血線升級! Lv.${this.armorLevel} (已+${totalHpBonus}HP) (${cost}G)`, 1500);
+        return true; // 升級成功
+    }
+
+    // --- 新增：處理舞蹈室互動 ---
+    handleDanceStudioInteraction(game) {
+        const constants = this.constants;
+        // 檢查冷卻、遊戲對象、等級上限
+        if (this.weaponUpgradeCooldown > 0 || !game || !constants || this.danceLevel >= constants.DANCE_STUDIO_MAX_LEVEL) {
+            return false;
+        }
+
+        // 計算成本
+        const cost = Math.floor(constants.DANCE_STUDIO_BASE_COST * (constants.DANCE_STUDIO_COST_MULTIPLIER ** this.danceLevel));
+
+        // 檢查金幣
+        if (this.gold < cost) {
+            return false;
+        }
+
+        // 執行升級
+        this.gold -= cost;
+        this.danceLevel++;
+        // 計算這次升級 *增加* 的閃避率
+        const prevTotalBonus = constants.DANCE_STUDIO_DODGE_BONUS_PER_LEVEL[this.danceLevel - 1];
+        const currentTotalBonus = constants.DANCE_STUDIO_DODGE_BONUS_PER_LEVEL[this.danceLevel];
+        const dodgeIncrease = currentTotalBonus - prevTotalBonus;
+
+        this.recalculateStats(); // 重新計算閃避率
+        this.weaponUpgradeCooldown = constants.WEAPON_UPGRADE_COOLDOWN; // 設置冷卻
+
+        game.setMessage(`🤸 閃避提升! Lv.${this.danceLevel} (+${(dodgeIncrease * 100).toFixed(1)}%) (${cost}G)`, 1500);
+        return true; // 升級成功
+    }
+
 
     attack(enemy, game) { // Needs game to find targets and add projectiles/effects
          if (!game || !game.constants) return; // Need game object
@@ -840,7 +1078,7 @@ export class Player extends Entity {
     }
 
 
-    // --- 修改：嘗試觸發自動技能 (使用計算後的屬性) ---
+    // --- 嘗試觸發自動技能 (使用計算後的屬性) ---
     tryActivateAutoSkills(game) {
         if (!game || !game.constants) return;
 

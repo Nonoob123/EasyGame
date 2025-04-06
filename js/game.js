@@ -7,13 +7,17 @@ import { distanceSq, distanceSqValues, simpleCollisionCheck } from './utils.js';
 import { Player } from './player.js'; // 玩家類
 import { Enemy } from './enemy.js'; // 敵人類
 import { Tree } from './environment.js'; // 環境物件 (樹木)
-import { Structure, Fence, Tower } from './structures.js'; // 建築物 (基礎、柵欄、塔)
-import { Shop } from './shop.js'; // 商店類
+import { Structure } from './structureBase.js'; // 從基礎文件導入 Structure
+// 導入其他建築物 (柵欄、塔、防具店、舞蹈室)
+import { Fence, Tower, ArmorShop, DanceStudio } from './structures.js'; // 從 structures.js 導入其他建築
+import { Shop } from './shop.js'; // 商店類 (交易站、武器店、治療室、研究所)
 // 導入所有投射物和效果類
 import { Bullet, Arrow, EnergyBolt, EnergyBeam } from './projectiles.js';
 import { SlashEffect, DamageNumber, ShockwaveEffect, NovaEffect } from './effects.js';
 import { InputHandler } from './inputHandler.js'; // 輸入處理器
-import { drawHUD, drawMessages } from './ui.js'; // UI 繪圖函數 (抬頭顯示、消息)
+// 導入所有 UI 繪圖函數
+import { drawHUD, drawMessages, drawWinScreen, drawEndScreen } from './ui.js';
+import { GoalCharacter } from './goalCharacter.js'; // 導入目標角色類
 
 
 // --- 遊戲主類 ---
@@ -49,9 +53,15 @@ export class Game {
      * 根據常量設置 Canvas 的寬度和高度。
      */
     setCanvasSize() {
-        this.canvas.width = this.constants.CANVAS_WIDTH;
-        this.canvas.height = this.constants.CANVAS_HEIGHT;
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
+        this.constants.CANVAS_WIDTH = this.canvas.width;
+        this.constants.CANVAS_HEIGHT = this.canvas.height;
     }
+
+    isTouchDevice() {
+        return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (navigator.msMaxTouchPoints > 0);
+    }    
 
     /**
      * 初始化或重置遊戲狀態變量。
@@ -68,12 +78,15 @@ export class Game {
         this.arrows = []; // 箭矢數組 (玩家弓箭)
         this.effects = []; // 效果數組 (劈砍、範圍技能、其他視覺效果)
         this.damageNumbers = []; // 傷害數字數組
+        this.goalCharacter = null; // 目標角色對象 (初始為 null)
 
         // 商店建築對象
         this.tradingPost = null;
         this.weaponShop = null; // 改名
         this.healingRoom = null;
         this.skillInstitute = null; // 新增研究所
+        this.armorShop = null; // 新增防具店
+        this.danceStudio = null; // 新增舞蹈室
 
         // 輸入狀態 (由 InputHandler 更新)
         this.keysPressed = {};
@@ -81,7 +94,7 @@ export class Game {
         // 遊戲邏輯變量
         this.enemySpawnTimer = 0; // 敵人生成計時器
         this.elapsedGameTime = 0; // 遊戲已進行時間
-        this.difficultyLevel = 1; // 當前難度等級
+        this.difficultyLevel = 0; // 當前難度等級
         this.bossSpawnedForLevel = -1; // 標記當前難度等級是否已生成 Boss/Mini-Boss
 
         // UI 消息
@@ -94,6 +107,7 @@ export class Game {
         // 遊戲循環控制
         this.lastTime = 0; // 上一幀的時間戳
         this.gameRunning = false; // 遊戲是否正在運行
+        this.gameState = 'running'; // 新增遊戲狀態: 'running', 'won', 'ended'
 
         // 樹木重生隊列
         this.treeRespawnQueue = [];
@@ -115,8 +129,11 @@ export class Game {
         this.spawnInitialEntities(); // 生成初始實體 (玩家、樹木、敵人)
         this.loadGameImages(); // 開始異步加載遊戲圖像
         this.attachListeners(); // 附加事件監聽器 (通過 InputHandler)
+        // 監聽視窗大小變化
+        window.addEventListener('resize', () => this.setCanvasSize());
+        this.setCanvasSize(); // 初始設置畫布大小
+
         console.log("遊戲初始化序列完成。等待圖像加載...");
-        // 遊戲循環將在圖像加載完成後由回調函數啟動
     }
 
     /**
@@ -134,20 +151,39 @@ export class Game {
         const weaponShopY = this.constants.middleBuildingY; // 使用導出的中間 Y
         const healingRoomY = this.constants.bottomBuildingY;
         const skillInstituteY = this.constants.instituteBuildingY;
+        // 假設新商店在研究所下方，需要調整 constants 或計算相對位置
+        const armorShopY = skillInstituteY + shopHeight + TILE_SIZE; // 研究所下方隔一個 TILE_SIZE
+        const danceStudioY = armorShopY + shopHeight + TILE_SIZE; // 防具店下方隔一個 TILE_SIZE
 
         // 創建交易站、武器店、治療室、研究所實例
         this.tradingPost = new Shop(shopX, tradingPostY, shopWidth, shopHeight, '#FFD700', 'trading_post'); // 黃色
         this.weaponShop = new Shop(shopX, weaponShopY, shopWidth, shopHeight, '#B22222', 'weapon_shop'); // 火磚色 (改名)
         this.healingRoom = new Shop(shopX, healingRoomY, shopWidth, shopHeight, '#90EE90', 'healing_room'); // 淺綠色
         this.skillInstitute = new Shop(shopX, skillInstituteY, shopWidth, shopHeight, '#8A2BE2', 'skill_institute'); // 紫羅蘭色 (新增)
+        // 創建防具店和舞蹈室實例
+        this.armorShop = new ArmorShop(shopX, armorShopY, shopWidth, shopHeight, this.constants);
+        this.danceStudio = new DanceStudio(shopX, danceStudioY, shopWidth, shopHeight, this.constants);
+
 
         // DEBUG LOGS for shop creation
         console.log('Trading Post:', this.tradingPost ? `(${this.tradingPost.x}, ${this.tradingPost.y})` : 'null');
         console.log('Weapon Shop:', this.weaponShop ? `(${this.weaponShop.x}, ${this.weaponShop.y})` : 'null');
         console.log('Healing Room:', this.healingRoom ? `(${this.healingRoom.x}, ${this.healingRoom.y})` : 'null');
         console.log('Skill Institute:', this.skillInstitute ? `(${this.skillInstitute.x}, ${this.skillInstitute.y})` : 'null');
+        console.log('Armor Shop:', this.armorShop ? `(${this.armorShop.x}, ${this.armorShop.y})` : 'null'); // 新增
+        console.log('Dance Studio:', this.danceStudio ? `(${this.danceStudio.x}, ${this.danceStudio.y})` : 'null'); // 新增
 
-        console.log(`商店和研究所已創建。安全區範圍: Y=[${this.constants.SAFE_ZONE_TOP_Y.toFixed(0)}, ${this.constants.SAFE_ZONE_BOTTOM_Y.toFixed(0)}]`);
+        // 更新安全區底部 Y 座標以包含新商店 (如果需要擴大安全區)
+        // 假設安全區自動擴展或新商店仍在原安全區內
+        // 如果需要擴大，應修改 constants.js 中的 SAFE_ZONE_BOTTOM_Y
+        const requiredBottomY = danceStudioY + shopHeight + TILE_SIZE; // 計算包含新商店所需的底部 Y
+        if (requiredBottomY > this.constants.SAFE_ZONE_BOTTOM_Y) {
+            console.warn(`新商店位置 (${danceStudioY + shopHeight}) 超出預設安全區底部 (${this.constants.SAFE_ZONE_BOTTOM_Y})。考慮調整 SAFE_ZONE_BOTTOM_Y。`);
+            // 可以在這裡動態調整，但不推薦，最好在 constants.js 中設置
+            // this.constants.SAFE_ZONE_BOTTOM_Y = requiredBottomY;
+        }
+
+        console.log(`所有商店已創建。安全區範圍: Y=[${this.constants.SAFE_ZONE_TOP_Y.toFixed(0)}, ${this.constants.SAFE_ZONE_BOTTOM_Y.toFixed(0)}]`);
     }
 
     /**
@@ -263,6 +299,9 @@ export class Game {
             this.gameRunning = true; // 設置遊戲運行標誌
             this.lastTime = performance.now(); // 記錄初始時間戳
             this.updateCamera(); // 初始更新一次攝像機位置
+            // --- 設置初始遊戲目標消息 (修改為多行) ---
+            const initialMessage = "遊戲目標：\n1. 堅持到關卡 50\n2. 場上會出現獎杯 🏆\n3. 把獎杯帶回安全區即可獲勝";
+            this.setMessage(initialMessage, 10000); // 顯示 10 秒
             requestAnimationFrame(this.gameLoop); // 請求第一幀動畫
             console.log("遊戲循環已啟動。");
         } else if (!this.areImagesLoaded) {
@@ -303,8 +342,8 @@ export class Game {
      * @param {number} deltaTime - 距離上一幀的時間差（毫秒）
      */
     update(deltaTime) {
-        // 基本檢查
-        if (!this.gameRunning || !this.player || !this.constants) return;
+        // 根據遊戲狀態決定是否更新
+        if (this.gameState !== 'running' || !this.player || !this.constants) return;
 
         // --- 更新遊戲時間和難度 ---
         this.elapsedGameTime += deltaTime; // 累加遊戲時間
@@ -316,6 +355,13 @@ export class Game {
             this.difficultyLevel = newDifficultyLevel; // 更新難度等級
             this.bossSpawnedForLevel = -1; // 重置 Boss 生成標記
             this.setMessage(`關卡 ${this.difficultyLevel}`, 2500); // 顯示提示消息
+        }; // <-- 添加分號
+        // --- 目標角色生成邏輯 (修改：只生成一次) ---
+        if (this.difficultyLevel >= 50 && !this.goalCharacter) { // 假設關卡 50 出現獎杯
+            this.spawnGoalCharacter(); // 生成獎杯實例
+            if (this.goalCharacter) {
+                 this.setMessage("獎杯出現了！🏆 快去尋找！", 5000);
+            }
         }
 
         // --- 更新實體 ---
@@ -340,6 +386,8 @@ export class Game {
         for (const effect of this.effects) if (effect.active) effect.update(deltaTime);
         // 更新活躍的傷害數字
         for (const dn of this.damageNumbers) if (dn.active) dn.update(deltaTime);
+        // 更新目標角色 (如果存在) - GoalCharacter 的 update 會處理跟隨
+        if (this.goalCharacter) this.goalCharacter.update(deltaTime, this);
 
         // --- 更新攝像機 ---
         this.updateCamera();
@@ -378,8 +426,23 @@ export class Game {
         this.effects = this.effects.filter(e => e.active); // 清理不活躍的效果
         this.damageNumbers = this.damageNumbers.filter(dn => dn.active);
 
+        // --- 檢查玩家與目標角色碰撞 ---
+        if (this.goalCharacter && this.goalCharacter.active && !this.player.hasMetGoalCharacter) {
+            if (simpleCollisionCheck(this.player, this.goalCharacter)) {
+                this.player.hasMetGoalCharacter = true;
+                this.goalCharacter.markAsInteracted(); // 標記互動
+                this.setMessage("找到目標！返回安全區！", 3000);
+                // 可選：播放音效
+            }
+        }
+
+        // --- 檢查勝利條件 (修改) ---
+        if (this.player.carryingTrophy && this.isPlayerInSafeZone()) {
+            this.winGame(); // 觸發遊戲勝利
+        }
+
         // --- 檢查遊戲結束條件 ---
-        if (this.player.hp <= 0 && this.gameRunning) { // 如果玩家生命值耗盡且遊戲仍在運行
+        if (this.player.hp <= 0 && this.gameState === 'running') { // 如果玩家生命值耗盡且遊戲仍在運行
             this.gameOver("你陣亡了！"); // 觸發遊戲結束
         }
     }
@@ -392,7 +455,7 @@ export class Game {
         let spawnHandled = false;
         const constants = this.constants;
         // 檢查是否生成 Boss
-        if (this.difficultyLevel % 10 === 0 && this.bossSpawnedForLevel !== this.difficultyLevel) {
+        if (this.difficultyLevel % 5 === 0 && this.bossSpawnedForLevel !== this.difficultyLevel) {
             const bossExists = this.enemies.some(e => e.active && e.enemyType === 'boss' && e.difficultyLevel === this.difficultyLevel);
             if (!bossExists) {
                 console.log(`嘗試為等級 ${this.difficultyLevel} 生成 BOSS`);
@@ -403,10 +466,10 @@ export class Game {
             } else { this.bossSpawnedForLevel = this.difficultyLevel; }
         }
         // 檢查是否生成 Mini-Boss
-        else if (this.difficultyLevel % 5 === 0 && this.bossSpawnedForLevel !== this.difficultyLevel) {
+        else if (this.difficultyLevel % 3 === 0 && this.bossSpawnedForLevel !== this.difficultyLevel) {
             const miniBossExists = this.enemies.some(e => e.active && e.enemyType === 'mini-boss' && e.difficultyLevel === this.difficultyLevel);
             if (!miniBossExists) {
-                let numToSpawn = 1 + Math.floor((this.difficultyLevel - 5) / 10);
+                let numToSpawn = 1 + Math.floor((this.difficultyLevel - 3) / 10);
                 numToSpawn = Math.max(1, numToSpawn);
                 console.log(`嘗試為等級 ${this.difficultyLevel} 生成 ${numToSpawn} 個 MINI-BOSS`);
                 let spawnedCount = 0;
@@ -482,6 +545,9 @@ export class Game {
         if (this.weaponShop && this.weaponShop.isRectInView(cam, visibleWidth, visibleHeight, leeway)) this.weaponShop.draw(this.ctx, this); // 改名
         if (this.healingRoom && this.healingRoom.isRectInView(cam, visibleWidth, visibleHeight, leeway)) this.healingRoom.draw(this.ctx, this);
         if (this.skillInstitute && this.skillInstitute.isRectInView(cam, visibleWidth, visibleHeight, leeway)) this.skillInstitute.draw(this.ctx, this); // 新增
+        // 將 game (this) 傳遞給新商店的 draw 方法，因為它們繼承自 Shop
+        if (this.armorShop && this.armorShop.isRectInView(cam, visibleWidth, visibleHeight, leeway)) this.armorShop.draw(this.ctx, this);
+        if (this.danceStudio && this.danceStudio.isRectInView(cam, visibleWidth, visibleHeight, leeway)) this.danceStudio.draw(this.ctx, this);
         // 繪製安全區文字
         this.drawSafeZoneText();
         // 繪製柵欄
@@ -498,6 +564,10 @@ export class Game {
         this.enemies.forEach(e => e.active && e.isRectInView(cam, visibleWidth, visibleHeight, leeway) && e.draw(this.ctx));
         // 繪製玩家 (如果活躍且在視圖內)
         if (this.player.active && this.player.isRectInView(cam, visibleWidth, visibleHeight, leeway)) this.player.draw(this.ctx);
+        // 繪製目標角色 (如果存在且活躍且未被攜帶，並且在視圖內)
+        if (this.goalCharacter && this.goalCharacter.active && !this.goalCharacter.isCarried && this.goalCharacter.isRectInView(cam, visibleWidth, visibleHeight, leeway)) {
+            this.goalCharacter.draw(this.ctx);
+        }
         // 繪製傷害數字
         this.damageNumbers.forEach(dn => dn.draw(this.ctx)); // 傷害數字通常不需要視錐體剔除
 
@@ -505,9 +575,15 @@ export class Game {
         this.ctx.restore(); // 恢復到應用攝像機和縮放之前的狀態
 
         // --- 繪製 UI (在頂層，不受攝像機和縮放影響) ---
-        // 調用從 ui.js 導入的函數
-        drawHUD(this.ctx, this);       // 繪製抬頭顯示 (血條、資源等)
-        drawMessages(this.ctx, this); // 繪製屏幕消息
+        // 根據遊戲狀態繪製不同的 UI
+        if (this.gameState === 'running') {
+            drawHUD(this.ctx, this);       // 繪製抬頭顯示 (血條、資源等)
+            drawMessages(this.ctx, this); // 繪製屏幕消息
+        } else if (this.gameState === 'won') {
+            drawWinScreen(this.ctx, this); // 繪製勝利畫面
+        } else if (this.gameState === 'ended') {
+            drawEndScreen(this.ctx, this); // 繪製結束畫面
+        }
     }
 
     /**
@@ -583,10 +659,18 @@ export class Game {
     }
 
     // --- UI 繪圖方法已移至 ui.js ---
-    // --- REMOVED drawHUD method ---
-    // --- REMOVED drawMessages method ---
+        // --- REMOVED drawHUD method ---
+        // --- REMOVED drawMessages method ---
 
-    // --- 遊戲狀態與交互 ---
+        // --- 輔助方法：檢查玩家是否在安全區 ---
+        isPlayerInSafeZone() {
+            if (!this.player || !this.constants) return false;
+            return this.player.centerX < this.constants.SAFE_ZONE_WIDTH &&
+                   this.player.centerY > this.constants.SAFE_ZONE_TOP_Y &&
+                   this.player.centerY < this.constants.SAFE_ZONE_BOTTOM_Y;
+        }; // <-- 添加分號
+
+        // --- 遊戲狀態與交互 ---
 
     /**
      * 在屏幕上設置一條消息，持續指定時間。
@@ -611,10 +695,10 @@ export class Game {
      * @param {string} reason - 遊戲結束的原因
      */
     gameOver(reason) {
-        if (!this.gameRunning) return; // 如果遊戲已經結束，則不執行
-        this.gameRunning = false; // 停止遊戲循環標誌
+        if (this.gameState !== 'running') return; // 如果遊戲已經結束或勝利，則不執行
+        this.gameState = 'ended'; // 設置遊戲狀態為結束
         console.log("遊戲結束:", reason);
-        this.detachListeners(); // 移除事件監聽器 (通過 InputHandler)
+        // this.detachListeners(); // 暫時不移除監聽器，以便結束畫面可以交互
 
         // 使用 requestAnimationFrame 確保在下一幀繪製結束畫面
         requestAnimationFrame(() => {
@@ -633,9 +717,24 @@ export class Game {
                  this.ctx.fillText(reason, this.canvas.width / 2, this.canvas.height / 2 + 15);
                  // 繪製重新開始提示
                  this.ctx.font = "18px 'Nunito', sans-serif";
-                 this.ctx.fillText("刷新頁面 (F5) 重新開始", this.canvas.width / 2, this.canvas.height / 2 + 60);
+                 this.ctx.fillText("遊戲結束!", this.canvas.width / 2, this.canvas.height / 2 - 30);
+                 // 繪製結束原因
+                 this.ctx.font = "22px 'Nunito', sans-serif";
+                 this.ctx.fillText(reason, this.canvas.width / 2, this.canvas.height / 2 + 15);
+                 // (結束畫面將在 ui.js 中繪製 "The End")
              }
         });
+    }
+
+    /**
+     * 處理遊戲勝利邏輯。
+     */
+    winGame() {
+        if (this.gameState !== 'running') return; // 確保只觸發一次
+        this.gameState = 'won';
+        console.log("恭喜！遊戲勝利！");
+        // 可以在這裡停止敵人生成或做其他清理
+        // this.detachListeners(); // 暫時不移除，以便勝利畫面按鈕可以交互
     }
 
     // --- 修改後的監聽器方法 (委派給 InputHandler) ---
@@ -782,7 +881,11 @@ export class Game {
          const TILE_SIZE = this.constants.TILE_SIZE;
          const gridX = Math.floor(worldX / TILE_SIZE) * TILE_SIZE;
          const gridY = Math.floor(worldY / TILE_SIZE) * TILE_SIZE;
-         if (gridX + TILE_SIZE / 2 < this.constants.SAFE_ZONE_WIDTH && gridY + TILE_SIZE / 2 > this.constants.SAFE_ZONE_TOP_Y && gridY + TILE_SIZE / 2 < this.constants.SAFE_ZONE_BOTTOM_Y) { this.setMessage("不能在安全區內建造!", 1500); return; }
+         // 檢查是否在安全區內
+         const isInSafeZone = gridX + TILE_SIZE / 2 < this.constants.SAFE_ZONE_WIDTH &&
+                              gridY + TILE_SIZE / 2 > this.constants.SAFE_ZONE_TOP_Y &&
+                              gridY + TILE_SIZE / 2 < this.constants.SAFE_ZONE_BOTTOM_Y;
+         if (isInSafeZone) { this.setMessage("不能在安全區內建造!", 1500); return; }
          if (this.isOccupied(gridX, gridY)) { this.setMessage("該位置已被佔用!", 1500); return; }
          this.player.wood -= this.constants.FENCE_COST;
          this.fences.push(new Fence(gridX, gridY, TILE_SIZE, TILE_SIZE, this.constants));
@@ -801,7 +904,11 @@ export class Game {
          const TILE_SIZE = this.constants.TILE_SIZE;
          const gridX = Math.floor(worldX / TILE_SIZE) * TILE_SIZE;
          const gridY = Math.floor(worldY / TILE_SIZE) * TILE_SIZE;
-         if (gridX + TILE_SIZE / 2 < this.constants.SAFE_ZONE_WIDTH && gridY + TILE_SIZE / 2 > this.constants.SAFE_ZONE_TOP_Y && gridY + TILE_SIZE / 2 < this.constants.SAFE_ZONE_BOTTOM_Y) { this.setMessage("不能在安全區內建造!", 1500); return; }
+         // 檢查是否在安全區內
+         const isInSafeZone = gridX + TILE_SIZE / 2 < this.constants.SAFE_ZONE_WIDTH &&
+                              gridY + TILE_SIZE / 2 > this.constants.SAFE_ZONE_TOP_Y &&
+                              gridY + TILE_SIZE / 2 < this.constants.SAFE_ZONE_BOTTOM_Y;
+         if (isInSafeZone) { this.setMessage("不能在安全區內建造!", 1500); return; }
          if (this.isOccupied(gridX, gridY)) { this.setMessage("該位置已被佔用!", 1500); return; }
          this.player.wood -= this.constants.TOWER_COST;
          this.towers.push(new Tower(gridX, gridY, TILE_SIZE, TILE_SIZE, this.constants));
@@ -822,11 +929,43 @@ export class Game {
          if (this.fences.some(f => f.active && f.x === gridX && f.y === gridY) ||
              this.towers.some(t => t.active && t.x === gridX && t.y === gridY)) { return true; }
          if ((this.tradingPost && simpleCollisionCheck(checkRect, this.tradingPost, tolerance)) ||
-             (this.weaponShop && simpleCollisionCheck(checkRect, this.weaponShop, tolerance)) || // 改名
-             (this.healingRoom && simpleCollisionCheck(checkRect, this.healingRoom, tolerance)) ||
-             (this.skillInstitute && simpleCollisionCheck(checkRect, this.skillInstitute, tolerance))) { return true; } // 新增
-         if (this.trees.some(tree => tree.active && simpleCollisionCheck(checkRect, tree, TILE_SIZE * 0.5))) { return true; }
-         return false;
+                 (this.weaponShop && simpleCollisionCheck(checkRect, this.weaponShop, tolerance)) || // 改名
+                 (this.healingRoom && simpleCollisionCheck(checkRect, this.healingRoom, tolerance)) ||
+                 (this.skillInstitute && simpleCollisionCheck(checkRect, this.skillInstitute, tolerance)) ||
+                 (this.armorShop && simpleCollisionCheck(checkRect, this.armorShop, tolerance)) || // 防具店檢查
+                 (this.danceStudio && simpleCollisionCheck(checkRect, this.danceStudio, tolerance)) || // 舞蹈室檢查
+                 (this.goalCharacter && this.goalCharacter.active && simpleCollisionCheck(checkRect, this.goalCharacter, tolerance))) { // 檢查目標角色
+                 return true;
+             }
+             if (this.trees.some(tree => tree.active && simpleCollisionCheck(checkRect, tree, TILE_SIZE * 0.5))) { return true; }
+             return false;
+    }
+
+    /**
+     * 生成目標角色。
+     */
+    spawnGoalCharacter() {
+        const constants = this.constants;
+        const size = constants.TILE_SIZE * 1.5; // 目標角色稍大一點
+        // 放置在世界最右側，垂直居中
+        const x = constants.WORLD_WIDTH - size - constants.TILE_SIZE; // 離右邊界一個瓦片距離
+        const y = constants.WORLD_HEIGHT / 2 - size / 2;
+
+        // 檢查該位置是否已被佔用 (雖然不太可能在邊界，但以防萬一)
+        let attempts = 0;
+        let finalY = y;
+        while (this.isOccupied(x, finalY) && attempts < 10) {
+            finalY += constants.TILE_SIZE; // 如果被佔用，嘗試向下移動
+            attempts++;
+        }
+
+        if (attempts >= 10) {
+            console.error("無法為目標角色找到生成位置！");
+            return;
+        }
+
+        this.goalCharacter = new GoalCharacter(x, finalY, size, constants);
+        console.log(`目標角色已生成於 (${x.toFixed(0)}, ${finalY.toFixed(0)})`);
     }
 
     // --- 尋找目標方法 ---
@@ -973,7 +1112,7 @@ export class Game {
     }
 
 
-    // --- 新增：技能觸發方法 ---
+    // --- 技能觸發方法 ---
 
     /**
      * 觸發範圍技能 1 (震盪波)。
@@ -1117,7 +1256,7 @@ export class Game {
             );
             this.bullets.push(beam);
             // console.log("技能 4 (能量光束) 觸發。");
-        }
+        }; // <-- 添加分號
     }
 
-} // 結束 Game 類
+}; // 結束 Game 類 (添加分號)

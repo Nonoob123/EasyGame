@@ -1,6 +1,6 @@
 'use strict';
 
-import { Structure } from './structures.js'; // 導入結構基類
+import { Structure } from './structureBase.js'; // 從新的基礎文件導入結構基類
 // 商店繪圖需要訪問 game.player 和 game.constants
 
 // --- 商店類 (Shop Class) ---
@@ -108,22 +108,32 @@ export class Shop extends Structure {
 
             case 'healing_room': // 治療室
                 titleText = "治療室";
-                subtitleText = "(靠近治療)"; // 提示靠近進行治療
+                subtitleText = "(靠近自動治療)"; // 更新副標題
                 const costPerHp = constants.HEALING_COST_PER_HP; // 每點 HP 的治療費用
-                const healAmount = 10; // 每次互動治療的量
-                const interactionCost = healAmount * costPerHp; // 每次互動的總費用
-                costText = `${healAmount}HP=${interactionCost}G`; // 顯示標準治療的費用
+
                 // 檢查玩家生命值是否已滿
                 if (player.hp >= player.maxHp) {
-                     costText = "生命值已滿"; costColor = '#AAFFAA'; // 生命值滿時顯示綠色
+                     costText = "生命值已滿";
+                     costColor = '#AAFFAA'; // 生命值滿時顯示綠色
                 }
                 // 檢查治療冷卻時間
                 else if (player.healingCooldown > 0) {
-                     costText = `冷卻: ${(player.healingCooldown / 1000).toFixed(1)}s`; costColor = '#FFAAAA'; // 冷卻時顯示淺紅色
+                     costText = `冷卻: ${(player.healingCooldown / 1000).toFixed(1)}s`;
+                     costColor = '#FFAAAA'; // 冷卻時顯示淺紅色
                 }
-                // 檢查玩家金幣是否足夠支付治療費用
-                else if (player.gold < interactionCost) {
-                 costText = `需 ${interactionCost}G`; costColor = '#FF6666'; // 金幣不足時顯示紅色，但仍顯示費用
+                // 計算補滿所需 HP 和金幣
+                else {
+                    const hpToHeal = Math.max(0, player.maxHp - player.hp); // 需要治療的 HP 量
+                    // 使用 Math.ceil 確保即使只差 0.1 HP 也要支付 1 金幣 (如果 costPerHp 是 1)
+                    const costToFull = Math.ceil(hpToHeal * costPerHp);
+                    // 顯示補滿所需的費用和 HP 量
+                    costText = `補滿 ${Math.ceil(hpToHeal)}HP = ${costToFull}G`;
+                    // 檢查玩家金幣是否足夠支付補滿費用
+                    if (player.gold < costToFull) {
+                        costColor = '#FF6666'; // 金幣不足時顯示紅色
+                    } else {
+                        costColor = '#FFD700'; // 金幣足夠時顯示預設金色
+                    }
                 }
                 break;
 
@@ -138,6 +148,40 @@ export class Shop extends Structure {
                     costColor = '#FFAAAA'; // 紅色表示無點數
                 }
                 break; // <--- 確保這裡有 break
+
+            case 'armor_shop': // 防具店
+                titleText = "防具店";
+                subtitleText = "(靠近升級血線)";
+                const currentArmorBonus = player.calculateArmorHpBonus(); // 計算當前總 HP 加成
+                if (player.armorLevel < constants.ARMOR_SHOP_MAX_LEVEL) {
+                    // 計算下一級成本
+                    const cost = Math.floor(constants.ARMOR_SHOP_BASE_COST * (constants.ARMOR_SHOP_COST_MULTIPLIER ** player.armorLevel));
+                    costText = `🩸Lv${player.armorLevel + 1}: ${cost}G\n(已+${currentArmorBonus}HP)`;
+                    if (player.gold < cost) costColor = '#FF6666'; // 金幣不足顯示紅色
+                } else {
+                    // 滿級時只顯示總加成
+                    costText = `🩸 血線已滿級 (總共+${currentArmorBonus}HP)`;
+                    costColor = '#AAFFAA'; // 滿級顯示綠色
+                }
+                break;
+
+            case 'dance_studio': // 舞蹈室
+                titleText = "舞蹈室";
+                subtitleText = "(靠近提升閃避)";
+                const currentDodgeBonus = player.calculateDanceDodgeBonus(); // 計算當前總閃避加成
+                if (player.danceLevel < constants.DANCE_STUDIO_MAX_LEVEL) {
+                    // 計算下一級成本
+                    const cost = Math.floor(constants.DANCE_STUDIO_BASE_COST * (constants.DANCE_STUDIO_COST_MULTIPLIER ** player.danceLevel));
+                    // 顯示當前總加成和下一級成本
+                    costText = `🤸Lv${player.danceLevel + 1}: ${cost}G\n(已+${(currentDodgeBonus * 100).toFixed(1)}%閃避)`;
+                    if (player.gold < cost) costColor = '#FF6666'; // 金幣不足顯示紅色
+                } else {
+                    // 滿級時只顯示總加成
+                    costText = `🤸 閃避已滿級 (總共${(currentDodgeBonus * 100).toFixed(1)}%)`;
+                    costColor = '#AAFFAA'; // 滿級顯示綠色
+                }
+                break;
+
         }
 
         // --- 繪製文字 ---
@@ -154,7 +198,24 @@ export class Shop extends Structure {
         // 繪製費用/狀態文本
         ctx.font = "bold 12px 'Nunito', sans-serif"; // 費用字體
         ctx.fillStyle = costColor; // 使用動態計算的顏色
-        ctx.fillText(costText, this.centerX, costY); // 在中心位置繪製費用文本
+
+        // 檢查 costText 是否包含換行符，以決定如何繪製
+        if (costText.includes('\n')) {
+            const lines = costText.split('\n');
+            const costYLine1 = this.y + 50; // 第一行 Y 座標
+            const costYLine2 = this.y + 64; // 第二行 Y 座標 (向下移動)
+
+            // 繪製第一行 (等級和費用)
+            ctx.fillText(lines[0], this.centerX, costYLine1);
+
+            // 繪製第二行 (HP 加成)，使用白色和小字體
+            ctx.fillStyle = 'white';
+            ctx.font = "11px 'Nunito', sans-serif";
+            ctx.fillText(lines[1], this.centerX, costYLine2);
+        } else {
+            // 如果沒有換行符，正常繪製單行 costText
+            ctx.fillText(costText, this.centerX, costY); // 在中心位置繪製費用文本
+        }
 
         ctx.restore(); // 恢復之前保存的繪圖狀態
     }

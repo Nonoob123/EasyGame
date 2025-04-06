@@ -187,11 +187,10 @@ export class Enemy extends Entity {
             // 如果冷卻結束且與玩家碰撞（使用簡化碰撞檢測，允許輕微重疊）
             if (this.attackCooldown <= 0 && simpleCollisionCheck(this, player, 5)) {
                 const actualDamage = this.damage; // 獲取敵人傷害值
-                player.takeDamage(actualDamage, game); // 對玩家造成傷害
+                player.takeDamage(actualDamage, game); // 對玩家造成傷害 (takeDamage 內部會處理是否顯示傷害數字)
                 // 重置攻擊冷卻時間（Boss 攻擊間隔稍長）
                 this.attackCooldown = (this.enemyType === 'boss' ? 1500 : 1000) + Math.random() * 300;
-                // 在玩家身上顯示紅色傷害數字
-                game.addDamageNumber(player.centerX, player.y, actualDamage, '#FF0000');
+                // 移除這裡的 addDamageNumber，交由 player.takeDamage 處理
             }
 
         } else { // 閒晃狀態 (僅限普通敵人)

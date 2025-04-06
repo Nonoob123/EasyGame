@@ -60,8 +60,16 @@ export const gameConstants = (() => {
         get SAFE_ZONE_TOP_Y() { // 安全區頂部 Y 座標（動態計算，基於最上方的交易站）
             return tradingPostY - verticalBuffer; // (740 - 80 = 660)
         },
-        get SAFE_ZONE_BOTTOM_Y() { // 安全區底部 Y 座標（動態計算，基於最下方的研究所）
-            return instituteBuildingY + shopHeight + verticalBuffer; // (1100 + 80 + 80 = 1260)
+        get SAFE_ZONE_BOTTOM_Y() { // 安全區底部 Y 座標（動態計算，基於最下方的建築）
+            // 找出所有建築的 Y 座標
+            const buildingYs = [tradingPostY, weaponShopY, healingRoomY, instituteBuildingY];
+            // 假設新商店的位置計算方式與 game.js 中一致
+            const armorShopY = instituteBuildingY + shopHeight + TILE_SIZE;
+            const danceStudioY = armorShopY + shopHeight + TILE_SIZE;
+            buildingYs.push(armorShopY, danceStudioY);
+            // 找到最低建築的底部 Y
+            const lowestBuildingY = Math.max(...buildingYs);
+            return lowestBuildingY + shopHeight + verticalBuffer; // 最低建築底部 + 緩衝區
         },
 
         // --- 玩家屬性 ---
@@ -69,22 +77,22 @@ export const gameConstants = (() => {
         PLAYER_DASH_SPEED_MULTIPLIER: 3.5, // 衝刺時的速度倍率
         PLAYER_DASH_DURATION: 180, // 衝刺持續時間 (毫秒)
         PLAYER_DASH_COOLDOWN: 1500, // 衝刺冷卻時間 (毫秒)
-        PLAYER_DASH_INVINCIBILITY_DURATION: 180, // 衝刺期間的無敵時間 (毫秒) - 與持續時間相同
+        PLAYER_DASH_INVINCIBILITY_DURATION: 300, // 衝刺期間的無敵時間 (毫秒) - 與持續時間相同
 
         // --- 敵人生成與屬性 ---
-        ENEMY_SPAWN_RATE_BASE: 1000, // 基礎敵人生成速率（毫秒）
-        ENEMY_SPAWN_RATE_SCALE_PER_LEVEL: 0.80, // 每級難度生成速率的縮放因子 (越小越快)
-        MAX_ENEMIES_BASE: 30, // 基礎最大敵人數量
-        MAX_ENEMIES_INCREASE_PER_LEVEL: 10, // 每級難度增加的最大敵人數量
+        ENEMY_SPAWN_RATE_BASE: 600, // 基礎敵人生成速率（毫秒）
+        ENEMY_SPAWN_RATE_SCALE_PER_LEVEL: 0.60, // 每級難度生成速率的縮放因子 (越小越快)
+        MAX_ENEMIES_BASE: 60, // 基礎最大敵人數量
+        MAX_ENEMIES_INCREASE_PER_LEVEL: 20, // 每級難度增加的最大敵人數量
         ENEMY_HP_BASE: 30, // 敵人基礎生命值
         ENEMY_DAMAGE_BASE: 10, // 敵人基礎傷害值
-        INITIAL_ENEMIES: 10, // 遊戲開始時的初始敵人數量
-        ENEMY_WANDER_CHANGE_DIR_TIME: 3000, // 敵人在閒晃狀態下改變方向的時間間隔（毫秒）
+        INITIAL_ENEMIES: 20, // 遊戲開始時的初始敵人數量
+        ENEMY_WANDER_CHANGE_DIR_TIME: 1500, // 敵人在閒晃狀態下改變方向的時間間隔（毫秒）
         ENEMY_SIGHT_RANGE_SQ: (TILE_SIZE * 15) ** 2, // 敵人視野範圍的平方（用於性能優化）
         ENEMY_COLLISION_DIST_SQ: (TILE_SIZE * 1.5) ** 2, // 敵人碰撞檢測距離的平方
         SAFE_SPAWN_DIST_SQ: (TILE_SIZE * 10) ** 2, // 確保敵人在玩家安全距離外生成的距離平方
-        TIME_PER_DIFFICULTY_LEVEL: 10000, // 提升一級難度所需的時間（毫秒）
-        ENEMY_HP_SCALING_FACTOR: 0.12, // 敵人生命值隨難度等級的增長因子
+        TIME_PER_DIFFICULTY_LEVEL: 7000, // 提升一級難度所需的時間（毫秒）
+        ENEMY_HP_SCALING_FACTOR: 0.15, // 敵人生命值隨難度等級的增長因子
         ENEMY_DAMAGE_SCALING_FACTOR: 0.08, // 敵人傷害值隨難度等級的增長因子
         ENEMY_BOOST_FACTOR_PER_5_LEVELS: 1.6, // 每 5 個難度等級，敵人獲得的額外增強因子
         ENEMY_SPEED_BASE: 1.0, // 敵人基礎移動速度
@@ -173,14 +181,14 @@ export const gameConstants = (() => {
         BOSS_BULLET_SPEED: 7, // Boss 子彈的飛行速度
         BOSS_TARGETED_BULLET_COUNT: 5, // Boss 目標攻擊發射的子彈數量
 
-        // --- 新增：自動玩家技能 ---
+        // --- 自動玩家技能 ---
         // 技能 1: 範圍攻擊 - 震盪波 (Shockwave)
-        SKILL_AOE1_DAMAGE: 35,       // 基礎傷害
-        SKILL_AOE1_COOLDOWN: 2000,    // 冷卻時間 (毫秒)
-        SKILL_AOE1_RADIUS: TILE_SIZE * 4, // 作用半徑
+        SKILL_AOE1_DAMAGE: 30,       // 基礎傷害
+        SKILL_AOE1_COOLDOWN: 1500,    // 冷卻時間 (毫秒)
+        SKILL_AOE1_RADIUS: TILE_SIZE * 6, // 作用半徑
 
         // 技能 2: 範圍攻擊 - 新星爆發 (Nova)
-        SKILL_AOE2_DAMAGE: 75,       // 基礎傷害
+        SKILL_AOE2_DAMAGE: 70,       // 基礎傷害
         SKILL_AOE2_COOLDOWN: 3000,   // 冷卻時間 (毫秒)
         SKILL_AOE2_RADIUS: TILE_SIZE * 7, // 作用半徑
 
@@ -192,8 +200,8 @@ export const gameConstants = (() => {
         SKILL_LINEAR1_SPEED: 9,      // 投射物速度
 
         // 技能 4: 直線穿透 - 能量光束 (Beam)
-        SKILL_LINEAR2_DAMAGE: 90,    // 基礎傷害
-        SKILL_LINEAR2_COOLDOWN: 3000,// 冷卻時間 (毫秒)
+        SKILL_LINEAR2_DAMAGE: 95,    // 基礎傷害
+        SKILL_LINEAR2_COOLDOWN: 3500,// 冷卻時間 (毫秒)
         SKILL_LINEAR2_RANGE: TILE_SIZE * 15, // 射程
         SKILL_LINEAR2_WIDTH: TILE_SIZE * 1.2, // 寬度
         SKILL_LINEAR2_SPEED: 7,      // 投射物速度
@@ -203,32 +211,63 @@ export const gameConstants = (() => {
 
         // 震盪波 (AOE1) 加成
         SKILL_AOE1_DAMAGE_PER_LEVEL: 120,     // 每級增加傷害
-        SKILL_AOE1_COOLDOWN_MULTIPLIER: 0.94, // 每級冷卻時間乘數 (減少 6%)
-        SKILL_AOE1_RADIUS_PER_LEVEL: TILE_SIZE * 0.3, // 每級增加半徑
+        SKILL_AOE1_COOLDOWN_MULTIPLIER: 1.99, // 每級冷卻時間乘數 (減少 6%)
+        SKILL_AOE1_RADIUS_PER_LEVEL: TILE_SIZE * 0.15, // 每級增加半徑
 
         // 新星爆發 (AOE2) 加成
-        SKILL_AOE2_DAMAGE_PER_LEVEL: 250,    // 每級增加傷害
+        SKILL_AOE2_DAMAGE_PER_LEVEL: 220,    // 每級增加傷害
         SKILL_AOE2_COOLDOWN_MULTIPLIER: 0.95, // 每級冷卻時間乘數 (減少 8%)
-        SKILL_AOE2_RADIUS_PER_LEVEL: TILE_SIZE * 0.5, // 每級增加半徑
+        SKILL_AOE2_RADIUS_PER_LEVEL: TILE_SIZE * 0.3, // 每級增加半徑
 
         // 能量箭 (Linear1) 加成
-        SKILL_LINEAR1_DAMAGE_PER_LEVEL: 120,   // 每級增加傷害
+        SKILL_LINEAR1_DAMAGE_PER_LEVEL: 330,   // 每級增加傷害
         SKILL_LINEAR1_COOLDOWN_MULTIPLIER: 0.95,// 每級冷卻時間乘數 (減少 5%)
-        SKILL_LINEAR1_RANGE_PER_LEVEL: TILE_SIZE * 0.8, // 每級增加射程
+        SKILL_LINEAR1_RANGE_PER_LEVEL: TILE_SIZE * 0.5, // 每級增加射程
         // SKILL_LINEAR1_WIDTH_PER_LEVEL: TILE_SIZE * 0.05, // 可選：每級增加寬度
 
         // 能量光束 (Linear2) 加成
-        SKILL_LINEAR2_DAMAGE_PER_LEVEL: 250,   // 每級增加傷害
+        SKILL_LINEAR2_DAMAGE_PER_LEVEL: 300,   // 每級增加傷害
         SKILL_LINEAR2_COOLDOWN_MULTIPLIER: 0.97,// 每級冷卻時間乘數 (減少 7%)
-        SKILL_LINEAR2_RANGE_PER_LEVEL: TILE_SIZE * 1.2, // 每級增加射程
+        SKILL_LINEAR2_RANGE_PER_LEVEL: TILE_SIZE * 1.4, // 每級增加射程
         // SKILL_LINEAR2_WIDTH_PER_LEVEL: TILE_SIZE * 0.08,  // 可選：每級增加寬度
 
-        // --- 新增：技能信息 (用於 UI) ---
+        // --- 技能信息 (用於 UI) ---
         SKILLS_INFO: [
             { index: 1, name: "震盪波", icon: "💥" },
             { index: 2, name: "新星爆發", icon: "🌟" },
             { index: 3, name: "能量箭", icon: "⚡" },
             { index: 4, name: "能量光束", icon: "☄️" }
-        ]
+        ],
+
+        // --- 防具店與舞蹈室常量 (等級化) ---
+        ARMOR_SHOP_MAX_LEVEL: 10, // 防具店最高等級
+        ARMOR_SHOP_BASE_COST: 110, // 防具店升級基礎成本
+        ARMOR_SHOP_COST_MULTIPLIER: 1.7, // 防具店成本每級乘數
+        ARMOR_SHOP_BASE_HP_BONUS: 80, // 防具店 Lv1 提供的 HP 加成
+        ARMOR_SHOP_HP_BONUS_INCREMENT: 320, // 防具店每級額外增加的 HP 量 (遞增)
+
+        DANCE_STUDIO_MAX_LEVEL: 10, // 舞蹈室最高等級
+        DANCE_STUDIO_BASE_COST: 110, // 舞蹈室升級基礎成本
+        DANCE_STUDIO_COST_MULTIPLIER: 1.7, // 舞蹈室成本每級乘數
+        DANCE_STUDIO_BASE_DODGE_BONUS: 0.0725, // 舞蹈室 Lv1 提供的閃避率 (約 7.3%) - 這是第一級的增量
+        // 舞蹈室每級增加的閃避率 (遞減)，目標是 Lv10 總加成為 0.5 (50%)
+        // Level:    1      2      3      4      5      6      7      8      9      10
+        // Increase: 0.0725 0.0675 0.0625 0.0575 0.0525 0.0475 0.0425 0.0375 0.0325 0.0275
+        // 預先計算好每級的 *總* 閃避加成，方便查找
+        DANCE_STUDIO_DODGE_BONUS_PER_LEVEL: [
+            0,      // Level 0 (未升級)
+            0.0725, // Level 1
+            0.14,   // Level 2 (+0.0675)
+            0.2025, // Level 3 (+0.0625)
+            0.26,   // Level 4 (+0.0575)
+            0.3125, // Level 5 (+0.0525)
+            0.36,   // Level 6 (+0.0475)
+            0.4025, // Level 7 (+0.0425)
+            0.44,   // Level 8 (+0.0375)
+            0.4725, // Level 9 (+0.0325)
+            0.60    // Level 10 (+0.0275) -> 總加成 60%
+            // 注意：這個數組的索引對應等級，索引 0 表示 0 級
+        ],
+        // PLAYER_BASE_DODGE_CHANCE: 0.00, // 確保基礎閃避為 0，如果需要基礎閃避，請取消註釋並調整上方數組
     };
 })(); // IIFE 結束
