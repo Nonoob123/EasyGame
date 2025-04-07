@@ -154,22 +154,22 @@ export class Enemy extends Entity {
         // 計算與玩家距離的平方（性能優化）
         const distToPlayerSq = distanceSq(this, player);
 
-        // 普通敵人在玩家進入安全區後切換到閒晃狀態
-        if (playerInSafeZone && this.enemyType === 'normal') {
+        // 所有敵人在玩家進入安全區後切換到閒晃狀態
+        if (playerInSafeZone) {
             if (this.aiState === 'chasing') {
                 this.aiState = 'wandering';
                 this.setNewWanderTarget(constants); // 設置新的閒晃目標
             }
-        } else { // 玩家不在安全區，或敵人是 Boss/迷你 Boss
-            // Boss 和迷你 Boss 總是追擊（除非玩家在安全區，但它們通常不會進入）
-            if (this.enemyType !== 'normal') {
+        } else { // 玩家不在安全區
+            // 如果正在閒晃且玩家靠近，則切換到追擊
+            if (this.aiState === 'wandering' && distToPlayerSq < constants.ENEMY_SIGHT_RANGE_SQ) {
                 this.aiState = 'chasing';
             }
-            // 普通敵人在閒晃時，如果玩家靠近則切換到追擊
-            else if (this.aiState === 'wandering' && distToPlayerSq < constants.ENEMY_SIGHT_RANGE_SQ) {
-                this.aiState = 'chasing';
+            // 如果不在閒晃狀態（例如原本就在追擊，或剛從安全區出來），確保切換/維持追擊狀態
+            else if (this.aiState !== 'wandering') {
+                 this.aiState = 'chasing';
             }
-            // 如果已經在追擊，則保持追擊狀態
+            // 如果正在閒晃且玩家距離遠，則繼續閒晃 (此條件隱含，無需代碼)
         }
 
         let moveTargetX = null, moveTargetY = null, currentSpeed = 0;

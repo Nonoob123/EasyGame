@@ -218,10 +218,9 @@ export class Bullet extends Entity {
                  // 計算子彈中心與玩家中心的距離平方
                  if (distanceSqValues(this.centerX, this.centerY, player.centerX, player.centerY) < requiredDistSq) {
                      const damageDealt = this.damage; // 造成的傷害
-                     player.takeDamage(damageDealt, game); // 玩家受到傷害
+                     player.takeDamage(damageDealt, game); // 玩家受到傷害 (takeDamage 內部會處理閃避和傷害數字顯示)
                      collisionOccurred = true; // 標記發生碰撞
-                     // 在玩家位置顯示傷害數字 (敵人命中用紅色)
-                     game.addDamageNumber(player.centerX, player.y, damageDealt, '#FF0000');
+                     // 不在此處添加傷害數字，交由 player.takeDamage 處理
                  }
              }
          }
