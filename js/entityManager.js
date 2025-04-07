@@ -136,69 +136,105 @@ export class EntityManager {
      * 此方法應由遊戲主循環定期調用。
      */
     trySpawnSpecialOrNormalEnemy() {
-        let spawnHandled = false; // 標記是否已處理生成（防止重複生成）
-        const constants = this.game.constants; // 獲取常量
-        const difficultyLevel = this.game.difficultyLevel; // 從遊戲狀態獲取當前難度
-
-         // --- 檢查是否生成 Boss ---
-        // 每 10 個難度等級生成一次 Boss，且本級 Boss 尚未生成
-        if (difficultyLevel % 10 === 0 && this.game.bossSpawnedForLevel !== difficultyLevel) {
-            // 檢查當前是否已存在本級的活躍 Boss
-            const bossExists = this.game.enemies.some(e => e.active && e.enemyType === 'boss' && e.difficultyLevel === difficultyLevel);
-            if (!bossExists) {
-                console.log(`嘗試為等級 ${difficultyLevel} 生成 BOSS`);
-                // 嘗試生成 Boss
-                if (this.spawnEnemy(false, difficultyLevel, 'boss', constants.BOSS_IMAGE_URL)) {
-                    this.game.bossSpawnedForLevel = difficultyLevel; // 標記本級 Boss 已生成（修改遊戲狀態）
-                    spawnHandled = true; // 標記已處理生成
-                } else { console.warn("生成 BOSS 失敗。"); }
-            } else {
-                // 如果 Boss 已存在，也標記本級已處理
-                this.game.bossSpawnedForLevel = difficultyLevel;
+        const difficultyLevel = this.game.difficultyLevel;
+        const constants = this.game.constants;
+        let spawnHandled = false;
+        
+        // 隨機決定是否生成特殊敵人
+        const specialEnemyChance = Math.min(0.3, 0.05 + (difficultyLevel * 0.01)); // 隨難度增加特殊敵人機率
+        
+        // 嘗試生成特殊敵人
+        if (Math.random() < specialEnemyChance) {
+            // 決定生成哪種特殊敵人
+            const specialTypes = ['fast', 'tank', 'ranged'];
+            const specialWeights = [0.5, 0.3, 0.2]; // 不同類型的權重
+            
+            // 根據權重選擇敵人類型
+            let typeIndex = 0;
+            const randValue = Math.random();
+            let cumulativeWeight = 0;
+            
+            for (let i = 0; i < specialWeights.length; i++) {
+                cumulativeWeight += specialWeights[i];
+                if (randValue <= cumulativeWeight) {
+                    typeIndex = i;
+                    break;
+                }
+            }
+            
+            const specialType = specialTypes[typeIndex];
+            
+            // 根據選擇的類型生成敵人
+            if (specialType === 'fast') {
+                this.spawnEnemy(false, difficultyLevel, 'fast', constants.ENEMY_FAST_IMAGE_URL);
+                spawnHandled = true;
+            } else if (specialType === 'tank') {
+                this.spawnEnemy(false, difficultyLevel, 'tank', constants.ENEMY_TANK_IMAGE_URL);
+                spawnHandled = true;
+            } else if (specialType === 'ranged') {
+                this.spawnEnemy(false, difficultyLevel, 'ranged', constants.ENEMY_RANGED_IMAGE_URL);
+                spawnHandled = true;
             }
         }
-         // --- 檢查是否生成 Mini-Boss ---
-        // 每 5 個難度等級（非 10 的倍數）生成一次 Mini-Boss，且本級特殊敵人尚未生成
-        else if (difficultyLevel % 5 === 0 && this.game.bossSpawnedForLevel !== difficultyLevel) {
-            // 檢查當前是否已存在本級的活躍 Mini-Boss
-            const miniBossExists = this.game.enemies.some(e => e.active && e.enemyType === 'mini-boss' && e.difficultyLevel === difficultyLevel);
-            if (!miniBossExists) {
-                // 計算要生成的 Mini-Boss 數量（隨難度增加）
-                let numToSpawn = 1 + Math.floor((difficultyLevel - 5) / 10);
-                numToSpawn = Math.max(1, numToSpawn); // 至少生成 1 個
-                console.log(`嘗試為等級 ${difficultyLevel} 生成 ${numToSpawn} 個 MINI-BOSS`);
-                let spawnedCount = 0;
-                // 循環嘗試生成指定數量的 Mini-Boss
-                for (let i = 0; i < numToSpawn; i++) {
-                    const activeCount = this.game.enemies.filter(e => e.active).length; // 當前活躍敵人數量
-                    // 計算最大敵人數量限制
-                    const maxEnemies = Math.floor(constants.MAX_ENEMIES_BASE + constants.MAX_ENEMIES_INCREASE_PER_LEVEL * (difficultyLevel - 1));
-                    // 如果達到最大數量限制，則停止生成
-                    if (activeCount >= maxEnemies) { console.warn("已達到最大敵人數量，無法生成更多 mini-boss。"); break; }
-                    // 嘗試生成 Mini-Boss
-                    if(this.spawnEnemy(false, difficultyLevel, 'mini-boss', constants.MINI_BOSS_IMAGE_URL)) {
-                        spawnedCount++;
-                    } else { console.warn(`生成 mini-boss #${i+1} 失敗。`); }
-                }
-                // 如果成功生成了至少一個 Mini-Boss
-                if (spawnedCount > 0) {
-                    this.game.bossSpawnedForLevel = difficultyLevel; // 標記本級特殊敵人已生成（修改遊戲狀態）
-                    spawnHandled = true; // 標記已處理生成
-                }
-            } else {
-                // 如果 Mini-Boss 已存在，也標記本級已處理
-                this.game.bossSpawnedForLevel = difficultyLevel;
-            }
-        }
-
-        // --- 生成普通敵人 ---
-        // 如果前面沒有生成特殊敵人，則生成普通敵人
+        
+        // 如果沒有生成特殊敵人，則生成普通敵人
         if (!spawnHandled) {
-             // 調用 spawnEnemy，這裡不需要處理返回值，因為生成循環由 Game 類控制
-             this.spawnEnemy(false, difficultyLevel, 'normal', constants.ENEMY_IMAGE_DATA_URL);
+            this.spawnEnemy(false, difficultyLevel, 'normal', constants.ENEMY_IMAGE_URL);
         }
     }
 
+    // 在entityManager.js中添加明確的Mini-Boss生成方法
+    spawnMiniBoss(difficultyLevel) {
+        const constants = this.game.constants;
+        const size = constants.TILE_SIZE * 1.5; // Mini-Boss 比普通敵人大
+        
+        // 尋找合適的生成位置
+        let x, y;
+        let attempts = 0;
+        const maxAttempts = 50;
+        
+        do {
+            // 在世界範圍內隨機生成座標（避開安全區）
+            x = Math.random() * (constants.WORLD_WIDTH - size * 2) + size;
+            y = Math.random() * (constants.WORLD_HEIGHT - size * 2) + size;
+            attempts++;
+            
+            // 確保不在安全區內
+            if (x < constants.SAFE_ZONE_WIDTH * 1.5) {
+                x = constants.SAFE_ZONE_WIDTH * 1.5 + Math.random() * 100;
+            }
+        } while (
+            // 檢查是否與其他實體重疊
+            this.game.enemies.some(e => e.active && 
+                distanceSqValues(x + size/2, y + size/2, e.centerX, e.centerY) < (size * 1.5) ** 2) &&
+            attempts < maxAttempts
+        );
+        
+        if (attempts >= maxAttempts) {
+            console.warn("無法為Mini-Boss找到合適的生成位置");
+            // 強制在遠離安全區的位置生成
+            x = constants.WORLD_WIDTH * 0.75;
+            y = constants.WORLD_HEIGHT * 0.5;
+        }
+        
+        // 創建Mini-Boss實例 - 使用直接導入的Enemy類，而不是this.game.Enemy
+        const miniBoss = new Enemy(
+            x, y, size, size, 
+            constants, 
+            difficultyLevel, 
+            'mini-boss', 
+            constants.MINI_BOSS_IMAGE_URL
+        );
+        
+        // 添加到敵人數組
+        this.game.enemies.push(miniBoss);
+        
+        // 顯示Mini-Boss生成消息
+        this.game.setMessage(`警告！Mini-Boss出現了！`, 3000);
+        
+        console.log(`Mini-Boss已生成於 (${x.toFixed(0)}, ${y.toFixed(0)})`);
+        return miniBoss;
+    }
 
     // --- 建築邏輯 ---
 
@@ -223,8 +259,18 @@ export class EntityManager {
        if ((this.game.tradingPost && simpleCollisionCheck(checkRect, this.game.tradingPost, tolerance)) ||
            (this.game.researchLab && simpleCollisionCheck(checkRect, this.game.researchLab, tolerance)) ||
            (this.game.healingRoom && simpleCollisionCheck(checkRect, this.game.healingRoom, tolerance))) {
-           return true;
-       }
+            return true;
+        }
+        // 檢查是否與主要商店建築碰撞 (從 game 對象訪問)
+        if ((this.game.tradingPost && simpleCollisionCheck(checkRect, this.game.tradingPost, tolerance)) ||
+            (this.game.weaponShop && simpleCollisionCheck(checkRect, this.game.weaponShop, tolerance)) || // 改名
+            (this.game.healingRoom && simpleCollisionCheck(checkRect, this.game.healingRoom, tolerance)) ||
+            (this.game.skillInstitute && simpleCollisionCheck(checkRect, this.game.skillInstitute, tolerance)) ||
+            (this.game.armorShop && simpleCollisionCheck(checkRect, this.game.armorShop, tolerance)) || // 防具店檢查
+            (this.game.danceStudio && simpleCollisionCheck(checkRect, this.game.danceStudio, tolerance)) || // 舞蹈室檢查
+            (this.game.goalCharacter && this.game.goalCharacter.active && simpleCollisionCheck(checkRect, this.game.goalCharacter, tolerance))) { // 檢查目標角色
+            return true;
+        }
         // 檢查是否與活躍的樹木碰撞（使用較大的容差，因為樹木可能不完全對齊網格）
         if (this.game.trees.some(tree => tree.active && simpleCollisionCheck(checkRect, tree, TILE_SIZE * 0.5))) {
              return true;
@@ -357,5 +403,58 @@ export class EntityManager {
         }
         // 可選：記錄重生數量
         // if (respawnedCount > 0) console.log(`重生了 ${respawnedCount} 棵樹。`);
+    }
+
+    // 修復 spawnBoss 方法中的邏輯錯誤
+    spawnBoss(difficultyLevel) {
+        const constants = this.game.constants;
+        const size = constants.TILE_SIZE * 2; // Boss 比 Mini-Boss 更大
+        
+        // 尋找合適的生成位置
+        let x, y;
+        let attempts = 0;
+        const maxAttempts = 50;
+        
+        do {
+            // 在世界範圍內隨機生成座標（避開安全區）
+            x = Math.random() * (constants.WORLD_WIDTH - size * 2) + size;
+            y = Math.random() * (constants.WORLD_HEIGHT - size * 2) + size;
+            attempts++;
+            
+            // 確保不在安全區內
+            if (x < constants.SAFE_ZONE_WIDTH * 2) {
+                x = constants.SAFE_ZONE_WIDTH * 2 + Math.random() * 150;
+            }
+        } while (
+            // 檢查是否與其他實體重疊
+            this.game.enemies.some(e => e.active && 
+                distanceSqValues(x + size/2, y + size/2, e.centerX, e.centerY) < (size * 2) ** 2) &&
+            attempts < maxAttempts
+        );
+        
+        if (attempts >= maxAttempts) {
+            console.warn("無法為Boss找到合適的生成位置");
+            // 強制在遠離安全區的位置生成
+            x = constants.WORLD_WIDTH * 0.8;
+            y = constants.WORLD_HEIGHT * 0.5;
+        }
+        
+        // 創建Boss實例 - 使用直接導入的Enemy類，而不是this.game.Enemy
+        const boss = new Enemy(
+            x, y, size, size, 
+            constants, 
+            difficultyLevel, 
+            'boss', 
+            constants.BOSS_IMAGE_URL
+        );
+        
+        // 添加到敵人數組
+        this.game.enemies.push(boss);
+        
+        // 顯示Boss生成消息
+        this.game.setMessage(`警告！Boss出現了！`, 5000);
+        
+        console.log(`Boss已生成於 (${x.toFixed(0)}, ${y.toFixed(0)})`);
+        return boss;
     }
 }

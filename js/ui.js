@@ -10,6 +10,109 @@ export let winScreenButtons = {
 };
 export let endScreenButton = null; // { x, y, width, height } for "Restart" (or similar)
 
+// --- 新增：世界背景和安全區繪圖函數 ---
+
+/**
+ * 繪製世界背景（主要是安全區的可視化）。
+ * @param {CanvasRenderingContext2D} ctx - 繪圖上下文。
+ * @param {Game} game - 遊戲主對象。
+ */
+function drawWorldBackground(ctx, game) {
+    ctx.save(); // 保存狀態
+    // 繪製安全區背景 (半透明綠色)
+    ctx.fillStyle = 'rgba(160, 210, 160, 0.3)';
+    const szTop = game.constants.SAFE_ZONE_TOP_Y;
+    const szBottom = game.constants.SAFE_ZONE_BOTTOM_Y;
+    const szWidth = game.constants.SAFE_ZONE_WIDTH;
+    ctx.fillRect(0, szTop, szWidth, szBottom - szTop); // 填充矩形
+    // 繪製安全區邊框 (半透明白色虛線)
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([10, 5]); // 設置虛線樣式
+    ctx.strokeRect(0, szTop, szWidth, szBottom - szTop); // 描邊矩形
+    ctx.setLineDash([]); // 清除虛線樣式
+    ctx.restore(); // 恢復狀態
+}
+
+/**
+ * 在安全區中間繪製 "安全區" 文字。
+ * @param {CanvasRenderingContext2D} ctx - 繪圖上下文。
+ * @param {Game} game - 遊戲主對象。
+ */
+ function drawSafeZoneText(ctx, game) {
+     ctx.save(); // 保存狀態
+     // 設置字體樣式
+     ctx.font = "bold 24px 'Nunito', sans-serif";
+     ctx.fillStyle = 'rgba(255, 255, 255, 0.65)'; // 半透明白色
+     ctx.textAlign = 'center'; // 水平居中
+     ctx.textBaseline = 'middle'; // 垂直居中
+     // 計算文字位置 (安全區通道的中心)
+     const shopAreaEndX = game.constants.TILE_SIZE * 4;
+     const textX = shopAreaEndX + (game.constants.SAFE_ZONE_WIDTH - shopAreaEndX) / 2;
+     const textY = (game.constants.SAFE_ZONE_TOP_Y + game.constants.SAFE_ZONE_BOTTOM_Y) / 2;
+     // 添加陰影以提高可讀性
+     ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+     ctx.shadowOffsetX = 1; ctx.shadowOffsetY = 1; ctx.shadowBlur = 2;
+     // 繪製文字
+     ctx.fillText("安全區", textX, textY);
+     ctx.restore(); // 恢復狀態
+ }
+
+/**
+ * 導出函數：繪製世界相關元素（背景、安全區）。
+ * @param {CanvasRenderingContext2D} ctx - 繪圖上下文。
+ * @param {Game} game - 遊戲主對象。
+ */
+export function drawWorld(ctx, game) {
+    drawWorldBackground(ctx, game);
+    drawSafeZoneText(ctx, game);
+}
+
+/**
+ * 新增：繪製所有遊戲實體。
+ * @param {CanvasRenderingContext2D} ctx - 繪圖上下文。
+ * @param {Game} game - 遊戲主對象。
+ */
+export function drawEntities(ctx, game) {
+    const cam = game.camera; // 攝像機對象
+    const zoom = game.constants.CAMERA_ZOOM;
+    const visibleWidth = game.canvas.width / zoom; // 可見區域的世界寬度
+    const visibleHeight = game.canvas.height / zoom; // 可見區域的世界高度
+    const leeway = 50 / zoom; // 視錐體剔除的緩衝區 (按縮放調整)
+
+    // 繪製樹木 (如果活躍且在視圖內)
+    game.trees.forEach(e => e.active && e.isRectInView(cam, visibleWidth, visibleHeight, leeway) && e.draw(ctx));
+
+    // 繪製商店 (如果存在且在視圖內)
+    if (game.tradingPost && game.tradingPost.isRectInView(cam, visibleWidth, visibleHeight, leeway)) game.tradingPost.draw(ctx, game);
+    if (game.weaponShop && game.weaponShop.isRectInView(cam, visibleWidth, visibleHeight, leeway)) game.weaponShop.draw(ctx, game);
+    if (game.healingRoom && game.healingRoom.isRectInView(cam, visibleWidth, visibleHeight, leeway)) game.healingRoom.draw(ctx, game);
+    if (game.skillInstitute && game.skillInstitute.isRectInView(cam, visibleWidth, visibleHeight, leeway)) game.skillInstitute.draw(ctx, game);
+    if (game.armorShop && game.armorShop.isRectInView(cam, visibleWidth, visibleHeight, leeway)) game.armorShop.draw(ctx, game);
+    if (game.danceStudio && game.danceStudio.isRectInView(cam, visibleWidth, visibleHeight, leeway)) game.danceStudio.draw(ctx, game);
+
+    // 繪製柵欄
+    game.fences.forEach(e => e.active && e.isRectInView(cam, visibleWidth, visibleHeight, leeway) && e.draw(ctx));
+    // 繪製防禦塔
+    game.towers.forEach(e => e.active && e.isRectInView(cam, visibleWidth, visibleHeight, leeway) && e.draw(ctx));
+    // 繪製視覺效果 (劈砍、範圍技能等)
+    game.effects.forEach(e => e.active && e.draw(ctx)); // 特效通常不需要視錐體剔除
+    // 繪製箭矢
+    game.arrows.forEach(e => e.active && e.isRectInView(cam, visibleWidth, visibleHeight, leeway) && e.draw(ctx));
+    // 繪製子彈 (包括技能投射物)
+    game.bullets.forEach(e => e.active && e.isRectInView(cam, visibleWidth, visibleHeight, leeway) && e.draw(ctx));
+    // 繪製敵人
+    game.enemies.forEach(e => e.active && e.isRectInView(cam, visibleWidth, visibleHeight, leeway) && e.draw(ctx));
+    // 繪製玩家 (如果活躍且在視圖內)
+    if (game.player.active && game.player.isRectInView(cam, visibleWidth, visibleHeight, leeway)) game.player.draw(ctx);
+    // 繪製目標角色 (如果存在且活躍且未被攜帶，並且在視圖內)
+    if (game.goalCharacter && game.goalCharacter.active && !game.goalCharacter.isCarried && game.goalCharacter.isRectInView(cam, visibleWidth, visibleHeight, leeway)) {
+        game.goalCharacter.draw(ctx);
+    }
+    // 繪製傷害數字
+    game.damageNumbers.forEach(dn => dn.draw(ctx)); // 傷害數字通常不需要視錐體剔除
+}
+
 
 /**
  * 繪製技能選項 UI。
@@ -432,6 +535,9 @@ export function drawHUD(ctx, game) {
     // --- 新增：繪製附近商店互動提示 ---
     drawNearbyShopInfo(ctx, game);
 
+    // --- 新增：繪製左下角遊戲目標框 ---
+    drawObjectiveBox(ctx, game);
+
     ctx.restore(); // 恢復繪圖狀態
 }
 
@@ -446,69 +552,66 @@ function drawNearbyShopInfo(ctx, game) {
     let shopToShow = null; // 要顯示信息的商店
     let minDistSq = Infinity; // 最短距離平方
 
+    // 將所有商店加入檢查列表，包括武器店
     const shops = [
         game.armorShop,
         game.danceStudio,
-        // 可以將其他商店也加入此數組進行統一處理
-        // game.weaponShop,
-        // game.healingRoom,
+        game.weaponShop,  // 添加武器店
+        game.healingRoom,
+        // game.tradingPost,
         // game.skillInstitute
+        // 如果有其他商店，也可以加入
     ];
 
-    shops.forEach(shop => {
-        if (shop && shop.interactionRadius) {
+    // 檢查玩家是否靠近任何商店
+    for (const shop of shops) {
+        if (!shop) continue; // 跳過未定義的商店
+        
+        // 使用 simpleCollisionCheck 或距離計算
+        if (simpleCollisionCheck(player, shop, 5)) { // 5 是容差值
             const distSq = distanceSq(player, shop);
-            // 顯示範圍比互動範圍稍大一點
-            if (distSq < (shop.interactionRadius * 1.5) ** 2 && distSq < minDistSq) {
+            if (distSq < minDistSq) {
                 minDistSq = distSq;
                 shopToShow = shop;
             }
         }
-    });
+    }
 
+    // 如果找到最近的商店，顯示其信息
     if (shopToShow) {
-        // 更新描述以確保顯示最新信息
-        if (typeof shopToShow.updateDescription === 'function') {
-            shopToShow.updateDescription(player);
-        } else {
-            // 對於沒有 updateDescription 的舊商店，可能需要不同的處理方式
-            // 或者確保所有商店都有類似的接口
-            console.warn(`商店 ${shopToShow.name || '未知'} 沒有 updateDescription 方法`);
-            // 嘗試使用現有 description
-            // shopToShow.description = shopToShow.description || "靠近互動";
-        }
-
-
-        // --- 繪製商店信息框 ---
+        // 獲取商店名稱
+        let shopName = "商店";
+        if (shopToShow === game.weaponShop) shopName = "武器店";
+        else if (shopToShow === game.armorShop) shopName = "防具店";
+        else if (shopToShow === game.healingRoom) shopName = "治療室";
+        else if (shopToShow === game.danceStudio) shopName = "舞蹈室";
+        else if (shopToShow === game.tradingPost) shopName = "交易站";
+        else if (shopToShow === game.skillInstitute) shopName = "研究所";
+        
+        // 繪製提示框
         const boxPadding = 10, fontSize = 14, cornerRadius = 5;
         const infoY = game.canvas.height - 60; // 顯示在底部偏上位置
 
         ctx.save();
         ctx.font = `bold ${fontSize}px 'Nunito', sans-serif`;
-        const nameText = shopToShow.name || "商店";
-        const descText = shopToShow.description || "靠近按 E 互動";
-        const nameMetrics = ctx.measureText(nameText);
-        const descMetrics = ctx.measureText(descText);
-        const boxWidth = Math.max(nameMetrics.width, descMetrics.width) + boxPadding * 2;
-        const boxHeight = fontSize * 2 + boxPadding * 2.5; // 兩行文字的高度
+        
+        // 將商店名稱和互動提示合併為一行
+        const infoText = `${shopName} - 按E互動`;
+        const textMetrics = ctx.measureText(infoText);
+        
+        const boxWidth = textMetrics.width + boxPadding * 2;
+        const boxHeight = fontSize + boxPadding * 2; // 單行文字的高度
         const boxX = game.canvas.width / 2 - boxWidth / 2; // 水平居中
 
         // 背景
         ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
         drawRoundedRect(ctx, boxX, infoY, boxWidth, boxHeight, cornerRadius);
         ctx.fill();
-
-        // 文字
+        
+        // 繪製合併後的文字
         ctx.fillStyle = 'white';
         ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        // 繪製名稱
-        ctx.font = `bold ${fontSize}px 'Nunito', sans-serif`;
-        ctx.fillText(nameText, game.canvas.width / 2, infoY + boxPadding + fontSize / 2);
-        // 繪製描述
-        ctx.font = `${fontSize * 0.9}px 'Nunito', sans-serif`;
-        ctx.fillText(descText, game.canvas.width / 2, infoY + boxPadding * 1.5 + fontSize * 1.5);
-
+        ctx.fillText(infoText, game.canvas.width / 2, infoY + boxPadding + fontSize / 2);
         ctx.restore();
     }
 }
@@ -625,6 +728,86 @@ export function drawMessages(ctx, game) {
 
 
     ctx.restore(); // 恢復繪圖狀態
+}
+
+/**
+ * 新增：繪製左下角的遊戲目標提示框。
+ * @param {CanvasRenderingContext2D} ctx - 繪圖上下文。
+ * @param {Game} game - 遊戲主對象。
+ */
+function drawObjectiveBox(ctx, game) {
+    // 確保必要的遊戲對象存在
+    if (!game || !game.constants) return;
+
+    const canvasWidth = game.canvas.width;
+    const canvasHeight = game.canvas.height;
+
+    // 目標文本內容
+    const objectiveTitle = "遊戲目標：";
+    const objectiveLines = [
+        "1. 堅持到關卡 50",
+        "2. 場上會出現獎杯 🏆",
+        "3. 把獎杯帶回安全區即可獲勝"
+    ];
+
+    // 樣式和佈局參數
+    const boxPadding = 12;
+    const titleFontSize = 16;
+    const lineFontSize = 14;
+    const lineHeight = lineFontSize * 1.3;
+    const cornerRadius = 6;
+    const boxMargin = 20; // 距離屏幕邊緣的距離
+
+    ctx.save();
+
+    // 計算文本寬度以確定框寬
+    ctx.font = `bold ${titleFontSize}px 'Nunito', sans-serif`;
+    const titleWidth = ctx.measureText(objectiveTitle).width;
+    let maxLineWidth = titleWidth;
+    ctx.font = `${lineFontSize}px 'Nunito', sans-serif`;
+    objectiveLines.forEach(line => {
+        const lineWidth = ctx.measureText(line).width;
+        if (lineWidth > maxLineWidth) {
+            maxLineWidth = lineWidth;
+        }
+    });
+
+    const boxWidth = maxLineWidth + boxPadding * 2;
+    // 計算框高 (標題 + 行數 * 行高 + 上下內邊距 + 標題和內容間距)
+    const boxHeight = titleFontSize + (objectiveLines.length * lineHeight) + boxPadding * 2 + boxPadding * 0.5;
+    // 計算框的位置 (左下角)
+    const boxX = boxMargin;
+    const boxY = canvasHeight - boxHeight - boxMargin;
+
+    // --- 繪製背景 ---
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; // 半透明黑色背景
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+    ctx.shadowBlur = 4;
+    drawRoundedRect(ctx, boxX, boxY, boxWidth, boxHeight, cornerRadius);
+    ctx.fill();
+
+    // --- 繪製文字 ---
+    ctx.shadowColor = 'transparent'; // 文字不需要陰影
+    ctx.fillStyle = 'white';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+
+    // 繪製標題
+    let currentY = boxY + boxPadding;
+    ctx.font = `bold ${titleFontSize}px 'Nunito', sans-serif`;
+    ctx.fillText(objectiveTitle, boxX + boxPadding, currentY);
+
+    // 繪製目標列表
+    currentY += titleFontSize + boxPadding * 0.5; // 標題和列表之間的間距
+    ctx.font = `${lineFontSize}px 'Nunito', sans-serif`;
+    objectiveLines.forEach(line => {
+        ctx.fillText(line, boxX + boxPadding, currentY);
+        currentY += lineHeight;
+    });
+
+    ctx.restore();
 }
 
 
@@ -901,4 +1084,77 @@ export function drawEndScreen(ctx, game) {
 
 
     ctx.restore(); // 恢復繪圖狀態
+}
+
+/**
+ * 繪製技能冷卻指示器
+ * @param {CanvasRenderingContext2D} ctx - 繪圖上下文
+ * @param {Game} game - 遊戲對象
+ */
+function drawSkillCooldowns(ctx, game) {
+    if (!game.player || !game.player.skills) return;
+    
+    const skills = game.player.skills;
+    const now = performance.now();
+    const skillKeys = ['dash', 'aoe1', 'aoe2', 'beam'];
+    const skillNames = {
+        'dash': '衝刺',
+        'aoe1': '震波',
+        'aoe2': '新星',
+        'beam': '光束'
+    };
+    
+    const startX = 10;
+    const startY = game.canvas.height - 60;
+    const width = 50;
+    const height = 50;
+    const gap = 10;
+    
+    ctx.save();
+    
+    // 繪製每個技能的冷卻狀態
+    skillKeys.forEach((key, index) => {
+        const skill = skills[key];
+        if (!skill || skill.level <= 0) return;
+        
+        const x = startX + (width + gap) * index;
+        const y = startY;
+        
+        // 繪製技能背景
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillRect(x, y, width, height);
+        
+        // 繪製技能名稱
+        ctx.fillStyle = 'white';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(skillNames[key], x + width/2, y + 15);
+        
+        // 繪製冷卻進度
+        if (skill.lastUsed && skill.cooldown) {
+            const elapsed = now - skill.lastUsed;
+            const cooldownRatio = Math.min(1, elapsed / skill.cooldown);
+            
+            if (cooldownRatio < 1) {
+                // 繪製冷卻遮罩
+                ctx.fillStyle = 'rgba(50, 50, 50, 0.7)';
+                const maskHeight = height * (1 - cooldownRatio);
+                ctx.fillRect(x, y, width, maskHeight);
+                
+                // 繪製剩餘冷卻時間
+                const remainingSec = Math.ceil((skill.cooldown - elapsed) / 1000);
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 16px Arial';
+                ctx.fillText(remainingSec, x + width/2, y + height/2);
+            }
+        }
+        
+        // 繪製技能快捷鍵
+        const keyBindings = ['SPACE', 'Q', 'W', 'E'];
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.font = '10px Arial';
+        ctx.fillText(keyBindings[index], x + width/2, y + height - 5);
+    });
+    
+    ctx.restore();
 }

@@ -130,6 +130,24 @@ export class Tower extends Structure {
         if (!this.active || !game) return; // 如果塔不活躍或缺少遊戲對象，則不更新
 
         this.fireCooldown -= deltaTime; // 減少冷卻時間
+        
+        // 升級塔的邏輯 - 隨時間增強
+        if (this.level < 3 && game.elapsedGameTime > 0) {
+            // 每5分鐘自動升級一次，最高3級
+            const upgradeTime = 300000; // 5分鐘 = 300000毫秒
+            const shouldUpgrade = Math.floor(game.elapsedGameTime / upgradeTime) + 1;
+            
+            if (shouldUpgrade > this.level) {
+                this.level = shouldUpgrade;
+                this.damage = game.constants.BULLET_DAMAGE * (1 + (this.level - 1) * 0.5); // 每級增加50%傷害
+                this.range = game.constants.TOWER_RANGE * (1 + (this.level - 1) * 0.2); // 每級增加20%範圍
+                this.fireRate = game.constants.TOWER_FIRE_RATE * (1 - (this.level - 1) * 0.15); // 每級減少15%冷卻
+                
+                // 添加升級視覺效果
+                game.effects.push(new NovaEffect(this.centerX, this.centerY, 40, 500, 'rgba(0, 255, 150, 0.7)'));
+            }
+        }
+        
         // 如果冷卻時間結束
         if (this.fireCooldown <= 0) {
             // 使用 game 的方法尋找範圍內最近的活躍敵人
@@ -176,13 +194,34 @@ export class Tower extends Structure {
     }
 
     /**
-     * 向目標敵人發射子彈。
-     * @param {Enemy} target - 目標敵人。
-     * @param {Game} game - 遊戲主對象，用於調用 addBullet 方法。
+     * 射擊指定的敵人。
+     * @param {Enemy} enemy - 目標敵人。
+     * @param {Game} game - 遊戲主對象，用於添加子彈。
      */
-    shoot(target, game) {
-         // 使用 game 的方法創建子彈，指定塔為發射者
-         // 傳遞選項，例如塔子彈的顏色
-        game.addBullet(this, target, { color: '#FF4500' }); // 塔發射橘紅色 (OrangeRed) 子彈
+    shoot(enemy, game) {
+        if (!enemy || !enemy.active || !game) return;
+        
+        // 計算子彈的起始位置 (塔的中心)
+        const startX = this.centerX;
+        const startY = this.centerY;
+        
+        // 計算子彈的方向 (指向敵人)
+        const dx = enemy.centerX - startX;
+        const dy = enemy.centerY - startY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const dirX = dx / dist;
+        const dirY = dy / dist;
+        
+        // 根據塔的等級決定子彈類型
+        if (this.level >= 3) {
+            // 3級塔發射能量彈
+            game.bullets.push(new EnergyBolt(startX, startY, dirX, dirY, this.damage * 1.5, 'tower'));
+        } else if (this.level >= 2) {
+            // 2級塔發射加強子彈
+            game.bullets.push(new Bullet(startX, startY, dirX, dirY, this.damage * 1.2, 'tower', 'rgba(255, 200, 0, 1)'));
+        } else {
+            // 1級塔發射普通子彈
+            game.bullets.push(new Bullet(startX, startY, dirX, dirY, this.damage, 'tower'));
+        }
     }
 }

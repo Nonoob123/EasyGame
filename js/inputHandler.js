@@ -1,6 +1,6 @@
 'use strict';
-// 導入 simpleCollisionCheck 和 distanceSq
-import { simpleCollisionCheck, distanceSq } from './utils.js';
+// 導入 simpleCollisionCheck 和 distanceSq, distanceSqValues
+import { simpleCollisionCheck, distanceSq, distanceSqValues } from './utils.js';
 // 導入勝利/結束畫面按鈕位置 (確保 ui.js 已導出)
 import { winScreenButtons, endScreenButton } from './ui.js';
 
@@ -17,6 +17,7 @@ export class InputHandler {
         this.actionButtons = [];
         this.mouseX = undefined;
         this.mouseY = undefined;
+        this.pendingBuildRequest = null; // 待處理的建造請求
 
         this._handleKeyDown = this._handleKeyDown.bind(this);
         this._handleKeyUp = this._handleKeyUp.bind(this);
@@ -70,13 +71,71 @@ export class InputHandler {
         this.mouseY = (event.clientY - rect.top) * scaleY;
     }
 
+    // --- 統一的互動觸發邏輯 (修正：基於碰撞和距離判斷) ---
+    _processInteraction() {
+        const player = this.game.player;
+        if (!player) return;
+
+        let collidingShops = []; // 儲存與玩家碰撞的商店
+        const interactionTolerance = 5; // 碰撞檢測的容差
+
+        // 定義所有可互動的商店及其對應的玩家處理方法
+        const shopsToCheck = [
+            { shop: this.game.weaponShop, handler: player.handleWeaponShopInteraction },
+            { shop: this.game.healingRoom, handler: player.handleHealingRoomInteraction },
+            { shop: this.game.armorShop, handler: player.handleArmorShopInteraction },
+            { shop: this.game.danceStudio, handler: player.handleDanceStudioInteraction },
+            { shop: this.game.tradingPost, handler: player.tradeDiamond },
+            { shop: this.game.skillInstitute, handler: null } // 技能研究所暫無處理方法
+        ];
+
+        // 檢查每個商店是否與玩家碰撞
+        for (const { shop, handler } of shopsToCheck) {
+            if (shop && simpleCollisionCheck(player, shop, interactionTolerance)) {
+                collidingShops.push({ shop, handler });
+            }
+        }
+
+        // 如果有多個碰撞的商店，選擇最近的一個
+        if (collidingShops.length > 0) {
+            let closestShop = collidingShops[0];
+            let minDistSq = distanceSqValues(
+                player.x + player.width / 2, 
+                player.y + player.height / 2,
+                closestShop.shop.x + closestShop.shop.width / 2,
+                closestShop.shop.y + closestShop.shop.height / 2
+            );
+
+            for (let i = 1; i < collidingShops.length; i++) {
+                const distSq = distanceSqValues(
+                    player.x + player.width / 2, 
+                    player.y + player.height / 2,
+                    collidingShops[i].shop.x + collidingShops[i].shop.width / 2,
+                    collidingShops[i].shop.y + collidingShops[i].shop.height / 2
+                );
+                if (distSq < minDistSq) {
+                    minDistSq = distSq;
+                    closestShop = collidingShops[i];
+                }
+            }
+
+            // 調用對應的處理方法
+            if (typeof closestShop.handler === 'function') {
+                // 傳遞 game 對象給處理方法
+                closestShop.handler.call(player, this.game);
+            } else {
+                console.warn('商店互動處理方法未定義:', closestShop.shop);
+            }
+        }
+    }
+
+
     _handleKeyDown(event) {
         // 在遊戲結束或勝利狀態下，只允許特定按鍵 (例如 F5)
         if (this.game.gameState !== 'running' && !['F5', 'F12'].includes(event.key)) {
              event.preventDefault(); // 阻止其他按鍵行為
              return;
         }
-        // if (!this.game.gameRunning && !['F5', 'F12'].includes(event.key)) return; // 舊的檢查方式
         const key = event.key.toLowerCase();
         this.keysPressed[key] = true;
         if (this.game.keysPressed) this.game.keysPressed[key] = true;
@@ -91,42 +150,14 @@ export class InputHandler {
             this.game.player.startDash(inputDx, inputDy);
         } else if (key === 'e' && this.game.player) {
             event.preventDefault();
-            // --- 互動邏輯 ('E' 鍵) ---
-            const player = this.game.player;
-            let interacted = false; // 標記是否已與商店互動
-
-            // 檢查防具店
-            const armorShop = this.game.armorShop;
-            if (armorShop && distanceSq(player, armorShop) < armorShop.interactionRadius ** 2) {
-                if (armorShop.upgradePlayer(player)) {
-                    // 升級成功，描述已在 upgradePlayer 中更新
-                    this.game.setMessage(`防具店: ${armorShop.description}`, 2000);
-                } else {
-                    // 升級失敗，顯示原因 (已滿級或金幣不足)
-                    this.game.setMessage(`防具店: ${armorShop.description}`, 1500);
-                }
-                interacted = true;
-            }
-            // 檢查舞蹈室 (如果未與防具店互動)
-            const danceStudio = this.game.danceStudio;
-            if (!interacted && danceStudio && distanceSq(player, danceStudio) < danceStudio.interactionRadius ** 2) {
-                if (danceStudio.upgradePlayer(player)) {
-                    this.game.setMessage(`舞蹈室: ${danceStudio.description}`, 2000);
-                } else {
-                    this.game.setMessage(`舞蹈室: ${danceStudio.description}`, 1500);
-                }
-                interacted = true;
-            }
-
-            // 如果沒有與商店互動，則執行砍樹
-            if (!interacted) {
-                player.collectTree(this.game);
-            }
+            this._processInteraction(); // 調用統一的互動處理邏輯
 
         } else if (['1', '2', '3', '4'].includes(key) && this.game.player && this.game.skillInstitute) {
             const player = this.game.player;
             const institute = this.game.skillInstitute;
-            if (simpleCollisionCheck(player, institute)) {
+            // 技能升級需要靠近研究所
+            const radius = institute.interactionRadius || (institute.width * 1.5);
+            if (distanceSq(player, institute) < radius ** 2) { // 技能升級仍可基於中心點
                 event.preventDefault();
                 const skillIndex = parseInt(key);
                 player.attemptSkillUpgrade(skillIndex, this.game);
@@ -159,51 +190,43 @@ export class InputHandler {
         const touchX = (touch.clientX - rect.left) * scaleX;
         const touchY = (touch.clientY - rect.top) * scaleY;
 
-        console.log('Touch start:', { x: touchX, y: touchY, scaleX, scaleY, rect });
+        //console.log('Touch start:', { x: touchX, y: touchY, scaleX, scaleY, rect });
 
         // --- 檢查勝利畫面按鈕觸控 ---
         if (this.game.gameState === 'won') {
-            // 檢查繼續遊戲按鈕
             const continueBtn = winScreenButtons.continue;
             if (continueBtn && touchX >= continueBtn.x && touchX <= continueBtn.x + continueBtn.width &&
                 touchY >= continueBtn.y && touchY <= continueBtn.y + continueBtn.height) {
                 console.log("觸控了 繼續遊戲");
                 this.game.gameState = 'running';
-                if (this.game.goalCharacter) {
-                    this.game.goalCharacter.active = false; // 讓目標角色消失
-                    // this.game.goalCharacter = null; // 或者直接移除引用
-                }
+                if (this.game.goalCharacter) this.game.goalCharacter.active = false;
                 if (this.game.player) {
-                    this.game.player.hasMetGoalCharacter = false; // 重置玩家狀態
-                    this.game.player.carryingTrophy = false; // 移除獎盃
-                    this.game.player.trophyReference = null; // 清除獎盃引用
+                    this.game.player.hasMetGoalCharacter = false;
+                    this.game.player.carryingTrophy = false;
+                    this.game.player.trophyReference = null;
                 }
-                this.touchActive = false; // 結束觸控處理
-                return; // 處理完畢
+                this.touchActive = false;
+                return;
             }
-            // 檢查結束遊戲按鈕
             const endBtn = winScreenButtons.end;
             if (endBtn && touchX >= endBtn.x && touchX <= endBtn.x + endBtn.width &&
                 touchY >= endBtn.y && touchY <= endBtn.y + endBtn.height) {
                 console.log("觸控了 結束遊戲");
                 this.game.gameState = 'ended';
-                this.touchActive = false; // 結束觸控處理
-                return; // 處理完畢
+                this.touchActive = false;
+                return;
             }
-             // 如果觸控了勝利畫面但沒點中按鈕，也阻止後續處理
-             // this.touchActive = false; // 不需要設置 false
-             return; // 阻止觸控穿透到遊戲內元素
+             return;
         }
         // --- 如果遊戲已結束，檢查是否點擊重新開始按鈕 ---
         if (this.game.gameState === 'ended') {
             if (endScreenButton && touchX >= endScreenButton.x && touchX <= endScreenButton.x + endScreenButton.width &&
                 touchY >= endScreenButton.y && touchY <= endScreenButton.y + endScreenButton.height) {
                 console.log("觸控了 重新開始");
-                this.game.init(); // 重新初始化遊戲
-                // 不需要設置 gameState，init 會處理
+                this.game.init();
             }
-            this.touchActive = false; // 結束觸控處理
-            return; // 處理完畢
+            this.touchActive = false;
+            return;
         }
 
         // --- 遊戲運行狀態下的觸控處理 ---
@@ -221,8 +244,9 @@ export class InputHandler {
             const distance = Math.sqrt(dx * dx + dy * dy);
             if (distance <= btn.r) {
                 console.log('Button clicked:', btn.label);
-                this.keysPressed[btn.key] = true;
-                this.game.keysPressed[btn.key] = true;
+                this.keysPressed[btn.key] = true; // 模擬按鍵按下
+                if (this.game.keysPressed) this.game.keysPressed[btn.key] = true;
+
                 if (btn.key === ' ' && this.game.player) {
                     let inputDx = 0, inputDy = 0;
                     if (this.keysPressed['w']) inputDy -= 1;
@@ -231,45 +255,19 @@ export class InputHandler {
                     if (this.keysPressed['d']) inputDx += 1;
                     this.game.player.startDash(inputDx, inputDy);
                 } else if (btn.key === 'e' && this.game.player) {
-                    // --- 觸控/點擊互動邏輯 ('E' 按鈕) ---
-                    const player = this.game.player;
-                    let interacted = false;
-                    // 檢查防具店
-                    const armorShop = this.game.armorShop;
-                    if (armorShop && distanceSq(player, armorShop) < armorShop.interactionRadius ** 2) {
-                        if (armorShop.upgradePlayer(player)) {
-                            this.game.setMessage(`防具店: ${armorShop.description}`, 2000);
-                        } else {
-                            this.game.setMessage(`防具店: ${armorShop.description}`, 1500);
-                        }
-                        interacted = true;
-                    }
-                    // 檢查舞蹈室
-                    const danceStudio = this.game.danceStudio;
-                    if (!interacted && danceStudio && distanceSq(player, danceStudio) < danceStudio.interactionRadius ** 2) {
-                        if (danceStudio.upgradePlayer(player)) {
-                            this.game.setMessage(`舞蹈室: ${danceStudio.description}`, 2000);
-                        } else {
-                            this.game.setMessage(`舞蹈室: ${danceStudio.description}`, 1500);
-                        }
-                        interacted = true;
-                    }
-                    // 砍樹
-                    if (!interacted) {
-                        player.collectTree(this.game);
-                    }
+                    this._processInteraction(); // <--- 調用修正後的互動邏輯
                 }
-                // 短暫按下效果 (觸控不需要延遲釋放)
-                // setTimeout(() => {
-                //     this.keysPressed[btn.key] = false;
-                //     this.game.keysPressed[btn.key] = false;
-                // }, 100);
+                // 觸控不需要延遲釋放按鍵狀態，在 touchend 中處理
                 buttonClicked = true;
+                break; // 一次觸控只點擊一個按鈕
             }
         }
 
-        // 檢查技能升級選項觸控
-        if (this.game.player && this.game.skillInstitute && simpleCollisionCheck(this.game.player, this.game.skillInstitute)) {
+        // 檢查技能升級選項觸控 (只有靠近研究所時才有效)
+        if (this.game.player && this.game.skillInstitute) {
+            const institute = this.game.skillInstitute;
+            const radius = institute.interactionRadius || (institute.width * 1.5);
+            if (distanceSq(this.game.player, institute) < radius ** 2) { // 技能升級仍可基於中心點
             const optionHeight = 40, optionWidth = 200, spacing = 10;
             const startY = this.game.canvas.height / 2 - (optionHeight * 2 + spacing * 1.5);
             const startX = this.game.canvas.width / 2 - optionWidth / 2;
@@ -281,9 +279,11 @@ export class InputHandler {
                     const skillIndex = i + 1;
                     this.game.player.attemptSkillUpgrade(skillIndex, this.game);
                     this.touchActive = false; // 點擊技能選項後結束觸控
+                    buttonClicked = true; // 標記為按鈕點擊，避免觸發移動
                     return;
                 }
             }
+        }
         }
 
         // 如果沒有點擊任何按鈕或技能選項，則認為是開始移動
@@ -296,7 +296,6 @@ export class InputHandler {
         event.preventDefault();
         // 只在遊戲運行狀態下處理移動
         if (!this.touchActive || this.game.gameState !== 'running') {
-            // console.log('Touch move skipped: touchActive is false or game not running');
             return;
         }
 
@@ -312,8 +311,6 @@ export class InputHandler {
         this.touchMoveX = (touch.clientX - rect.left) * scaleX;
         this.touchMoveY = (touch.clientY - rect.top) * scaleY;
 
-        // console.log('Touch move:', { x: this.touchMoveX, y: this.touchMoveY }); // 減少日誌
-
         const dx = this.touchMoveX - this.touchStartX;
         const dy = this.touchMoveY - this.touchStartY;
         const distance = Math.sqrt(dx * dx + dy * dy);
@@ -326,12 +323,10 @@ export class InputHandler {
         this.keysPressed['d'] = dx > threshold && distance > threshold;
         // 同步到 game.keysPressed
         Object.keys(this.keysPressed).forEach(key => {
-            if (['w', 'a', 's', 'd'].includes(key)) { // 只同步移動鍵
+            if (['w', 'a', 's', 'd'].includes(key)) {
                  this.game.keysPressed[key] = this.keysPressed[key];
             }
         });
-
-        // console.log('Movement keys:', this.keysPressed); // 減少日誌
     }
 
     _handleTouchEnd(event) {
@@ -347,134 +342,80 @@ export class InputHandler {
         this.keysPressed[' '] = false; // 確保釋放衝刺鍵
         // 同步到 game.keysPressed
         Object.keys(this.keysPressed).forEach(key => {
-            this.game.keysPressed[key] = this.keysPressed[key];
+            if (this.game.keysPressed) this.game.keysPressed[key] = false;
         });
     }
 
     _handleClick(event) {
-        // 檢查遊戲狀態，只在運行或勝利時處理點擊
-        if (this.game.gameState === 'ended' || !this.game.player || !this.game.canvas) return;
-
+        event.preventDefault();
+        
+        // 獲取點擊在 Canvas 上的坐標
         const rect = this.game.canvas.getBoundingClientRect();
         const scaleX = this.game.canvas.width / rect.width;
         const scaleY = this.game.canvas.height / rect.height;
         const clickX = (event.clientX - rect.left) * scaleX;
         const clickY = (event.clientY - rect.top) * scaleY;
-
-        // --- 檢查勝利畫面按鈕點擊 ---
-        if (this.game.gameState === 'won') {
-            // 檢查繼續遊戲按鈕
-            const continueBtn = winScreenButtons.continue;
-            if (continueBtn && clickX >= continueBtn.x && clickX <= continueBtn.x + continueBtn.width &&
-                clickY >= continueBtn.y && clickY <= continueBtn.y + continueBtn.height) {
-                console.log("點擊了 繼續遊戲");
-                this.game.gameState = 'running'; // 恢復遊戲運行
-                if (this.game.goalCharacter) {
-                    this.game.goalCharacter.active = false; // 讓目標角色消失
-                    // this.game.goalCharacter = null; // 或者直接移除引用 (setting active=false is enough)
-                }
-                if (this.game.player) {
-                    this.game.player.hasMetGoalCharacter = false; // 重置玩家狀態
-                    this.game.player.carryingTrophy = false; // 移除獎盃
-                    this.game.player.trophyReference = null; // 清除獎盃引用
-                }
-                return; // 處理完畢，退出函數
+        
+        // 處理遊戲勝利畫面的按鈕點擊
+        if (this.game.gameState === 'won' && winScreenButtons) {
+            // 檢查"繼續遊戲"按鈕
+            if (winScreenButtons.continue && 
+                clickX >= winScreenButtons.continue.x && 
+                clickX <= winScreenButtons.continue.x + winScreenButtons.continue.width &&
+                clickY >= winScreenButtons.continue.y && 
+                clickY <= winScreenButtons.continue.y + winScreenButtons.continue.height) {
+                console.log("點擊了'繼續遊戲'按鈕");
+                this.game.restart();
+                return;
             }
-            // 檢查結束遊戲按鈕
-            const endBtn = winScreenButtons.end;
-            if (endBtn && clickX >= endBtn.x && clickX <= endBtn.x + endBtn.width &&
-                clickY >= endBtn.y && clickY <= endBtn.y + endBtn.height) {
-                console.log("點擊了 結束遊戲");
-                this.game.gameState = 'ended'; // 設置為結束狀態
-                return; // 處理完畢，退出函數
+            
+            // 檢查"結束遊戲"按鈕
+            if (winScreenButtons.end && 
+                clickX >= winScreenButtons.end.x && 
+                clickX <= winScreenButtons.end.x + winScreenButtons.end.width &&
+                clickY >= winScreenButtons.end.y && 
+                clickY <= winScreenButtons.end.y + winScreenButtons.end.height) {
+                console.log("點擊了'結束遊戲'按鈕");
+                // 這裡可以添加結束遊戲的邏輯，例如返回主菜單
+                window.location.reload(); // 簡單地重新加載頁面
+                return;
             }
-            // 如果點擊了勝利畫面但沒點中按鈕，也阻止後續處理
-            return;
         }
-        // --- 如果遊戲已結束，檢查是否點擊重新開始按鈕 ---
-        if (this.game.gameState === 'ended') {
-            if (endScreenButton && clickX >= endScreenButton.x && clickX <= endScreenButton.x + endScreenButton.width &&
-                clickY >= endScreenButton.y && clickY <= endScreenButton.y + endScreenButton.height) {
-                console.log("點擊了 重新開始");
-                this.game.init(); // 重新初始化遊戲
-                // 不需要設置 gameState，init 會處理
+        
+        // 處理遊戲結束畫面的重新開始按鈕點擊
+        if (this.game.gameState === 'ended' && endScreenButton) {
+            if (clickX >= endScreenButton.x && 
+                clickX <= endScreenButton.x + endScreenButton.width &&
+                clickY >= endScreenButton.y && 
+                clickY <= endScreenButton.y + endScreenButton.height) {
+                console.log("點擊了'重新開始'按鈕");
+                this.game.restart();
+                return;
             }
-            return; // 處理完畢
         }
-
-        // --- 遊戲運行狀態下的點擊處理 ---
+        
+        // 如果遊戲正在運行，處理其他點擊邏輯
         if (this.game.gameState === 'running') {
-            // 檢查遊戲內動作按鈕點擊
-            for (const btn of this.actionButtons) {
-                const dx = clickX - btn.cx;
-                const dy = clickY - btn.cy;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                if (distance <= btn.r) {
-                    this.keysPressed[btn.key] = true;
-                    this.game.keysPressed[btn.key] = true;
-                    if (btn.key === ' ' && this.game.player) {
-                        let inputDx = 0, inputDy = 0;
-                        if (this.keysPressed['w']) inputDy -= 1;
-                        if (this.keysPressed['s']) inputDy += 1;
-                        if (this.keysPressed['a']) inputDx -= 1;
-                        if (this.keysPressed['d']) inputDx += 1;
-                        this.game.player.startDash(inputDx, inputDy);
-                    } else if (btn.key === 'e' && this.game.player) {
-                        // --- 觸控/點擊互動邏輯 ('E' 按鈕) ---
-                        const player = this.game.player;
-                        let interacted = false;
-                         // 檢查防具店
-                        const armorShop = this.game.armorShop;
-                        if (armorShop && distanceSq(player, armorShop) < armorShop.interactionRadius ** 2) {
-                            if (armorShop.upgradePlayer(player)) {
-                                this.game.setMessage(`防具店: ${armorShop.description}`, 2000);
-                            } else {
-                                this.game.setMessage(`防具店: ${armorShop.description}`, 1500);
-                            }
-                            interacted = true;
+            // 檢查技能升級選項點擊 (只有靠近研究所時才有效)
+            if (this.game.player && this.game.skillInstitute) {
+                const institute = this.game.skillInstitute;
+                const radius = institute.interactionRadius || (institute.width * 1.5);
+                if (distanceSq(this.game.player, institute) < radius ** 2) {
+                    const optionHeight = 40, optionWidth = 200, spacing = 10;
+                    const startY = this.game.canvas.height / 2 - (optionHeight * 2 + spacing * 1.5);
+                    const startX = this.game.canvas.width / 2 - optionWidth / 2;
+                    for (let i = 0; i < 4; i++) {
+                        const y = startY + i * (optionHeight + spacing);
+                        if (clickX >= startX && clickX <= startX + optionWidth &&
+                            clickY >= y && clickY <= y + optionHeight) {
+                            console.log('Skill option clicked:', i + 1);
+                            const skillIndex = i + 1;
+                            this.game.player.attemptSkillUpgrade(skillIndex, this.game);
+                            return;
                         }
-                        // 檢查舞蹈室
-                        const danceStudio = this.game.danceStudio;
-                        if (!interacted && danceStudio && distanceSq(player, danceStudio) < danceStudio.interactionRadius ** 2) {
-                            if (danceStudio.upgradePlayer(player)) {
-                                this.game.setMessage(`舞蹈室: ${danceStudio.description}`, 2000);
-                            } else {
-                                this.game.setMessage(`舞蹈室: ${danceStudio.description}`, 1500);
-                            }
-                            interacted = true;
-                        }
-                        // 砍樹
-                        if (!interacted) {
-                            player.collectTree(this.game);
-                        }
-                    }
-                     // 短暫按下效果
-                    setTimeout(() => {
-                        this.keysPressed[btn.key] = false;
-                        this.game.keysPressed[btn.key] = false;
-                    }, 100);
-                    return; // 處理完畢
-                }
-            }
-
-            // 檢查技能升級選項點擊
-            if (this.game.player && this.game.skillInstitute && simpleCollisionCheck(this.game.player, this.game.skillInstitute)) {
-                const optionHeight = 40, optionWidth = 200, spacing = 10;
-                const startY = this.game.canvas.height / 2 - (optionHeight * 2 + spacing * 1.5);
-                const startX = this.game.canvas.width / 2 - optionWidth / 2;
-                for (let i = 0; i < 4; i++) {
-                    const y = startY + i * (optionHeight + spacing);
-                    if (clickX >= startX && clickX <= startX + optionWidth &&
-                        clickY >= y && clickY <= y + optionHeight) {
-                        const skillIndex = i + 1;
-                        this.game.player.attemptSkillUpgrade(skillIndex, this.game);
-                        return; // 處理完畢
                     }
                 }
             }
-
-            // 如果點擊未命中任何按鈕或選項，則視為建造柵欄
-            this._convertAndBuild(event, this.game.buildFence);
         }
     }
 
@@ -482,26 +423,24 @@ export class InputHandler {
         // 只在遊戲運行狀態下處理右鍵點擊
         if (this.game.gameState !== 'running') {
              event.preventDefault();
-             return;
-        }
-        this._convertAndBuild(event, this.game.buildTower);
-    }
+              return;
+         }
+         // 記錄建造塔請求
+         event.preventDefault();
+         const rect = this.game.canvas.getBoundingClientRect();
+         const scaleX = this.game.canvas.width / rect.width;
+         const scaleY = this.game.canvas.height / rect.height;
+         const canvasX = (event.clientX - rect.left) * scaleX;
+         const canvasY = (event.clientY - rect.top) * scaleY;
+         const worldX = (canvasX / this.game.constants.CAMERA_ZOOM) + this.game.camera.x;
+         const worldY = (canvasY / this.game.constants.CAMERA_ZOOM) + this.game.camera.y;
+         this.pendingBuildRequest = { type: 'tower', x: worldX, y: worldY };
+         console.log("記錄建造塔請求:", this.pendingBuildRequest);
+     }
 
-    _convertAndBuild(event, buildFunction) {
-        // 確保遊戲正在運行
-        if (this.game.gameState !== 'running' || !this.game.player || !this.game.canvas) return;
-        event.preventDefault();
-        const rect = this.game.canvas.getBoundingClientRect();
-        const scaleX = this.game.canvas.width / rect.width;
-        const scaleY = this.game.canvas.height / rect.height;
-        const canvasX = (event.clientX - rect.left) * scaleX;
-        const canvasY = (event.clientY - rect.top) * scaleY;
-        const worldX = (canvasX / this.game.constants.CAMERA_ZOOM) + this.game.camera.x;
-        const worldY = (canvasY / this.game.constants.CAMERA_ZOOM) + this.game.camera.y;
-        buildFunction.call(this.game, worldX, worldY);
-    }
+     // --- REMOVED _convertAndBuild method ---
 
-    draw(ctx) {
+     draw(ctx) {
         // 只在遊戲運行狀態下繪製搖桿和動作按鈕
         if (this.game.gameState !== 'running') return;
 

@@ -19,6 +19,28 @@ export class Shop extends Structure {
         // 商店通常是不可摧毀的，生命值設為無限大
         super(x, y, width, height, color, Infinity);
         this.type = type; // 商店的具體類型
+        // 添加預設互動半徑，子類可以覆蓋
+        this.interactionRadius = this.width * 1.5; // 例如，寬度的 1.5 倍作為半徑
+        
+        // 添加名稱和描述屬性，用於顯示互動提示
+        this.name = this.getShopName();
+        this.description = "按E互動";
+    }
+
+    /**
+     * 根據商店類型獲取商店名稱
+     * @returns {string} 商店名稱
+     */
+    getShopName() {
+        switch(this.type) {
+            case 'trading_post': return "交易站";
+            case 'weapon_shop': return "武器店";
+            case 'healing_room': return "治療室";
+            case 'skill_institute': return "技能研究所";
+            case 'armor_shop': return "防具店";
+            case 'dance_studio': return "舞蹈室";
+            default: return "商店";
+        }
     }
 
     /**
@@ -67,7 +89,7 @@ export class Shop extends Structure {
 
             case 'weapon_shop': // 武器店 (原研究室)
                 titleText = "武器店"; // 改名
-                subtitleText = "(靠近升級武器)"; // 提示靠近進行升級
+                subtitleText = "(升級武器)"; // 提示進行升級
                 // 檢查武器升級冷卻時間
                 if (player.weaponUpgradeCooldown > 0) {
                     costText = `冷卻: ${(player.weaponUpgradeCooldown / 1000).toFixed(1)}s`; // 顯示剩餘冷卻時間
@@ -108,7 +130,7 @@ export class Shop extends Structure {
 
             case 'healing_room': // 治療室
                 titleText = "治療室";
-                subtitleText = "(靠近自動治療)"; // 更新副標題
+                subtitleText = "(補血)"; // 更新副標題
                 const costPerHp = constants.HEALING_COST_PER_HP; // 每點 HP 的治療費用
 
                 // 檢查玩家生命值是否已滿
@@ -139,7 +161,7 @@ export class Shop extends Structure {
 
             case 'skill_institute': // 技能研究所 (新增)
                 titleText = "研究所";
-                subtitleText = "(學習/升級自動技能)"; // 簡化副標題
+                subtitleText = "(學習/升級技能)"; // 簡化副標題
                 if (player.skillPoints > 0) { // 只根據是否有技能點顯示狀態
                     costText = `可用點數: ${player.skillPoints}🧬`;
                     costColor = '#AAFFAA'; // 綠色表示可用
@@ -151,7 +173,7 @@ export class Shop extends Structure {
 
             case 'armor_shop': // 防具店
                 titleText = "防具店";
-                subtitleText = "(靠近升級血線)";
+                subtitleText = "(提升血量上限)";
                 const currentArmorBonus = player.calculateArmorHpBonus(); // 計算當前總 HP 加成
                 if (player.armorLevel < constants.ARMOR_SHOP_MAX_LEVEL) {
                     // 計算下一級成本
@@ -167,7 +189,7 @@ export class Shop extends Structure {
 
             case 'dance_studio': // 舞蹈室
                 titleText = "舞蹈室";
-                subtitleText = "(靠近提升閃避)";
+                subtitleText = "(提升閃避)";
                 const currentDodgeBonus = player.calculateDanceDodgeBonus(); // 計算當前總閃避加成
                 if (player.danceLevel < constants.DANCE_STUDIO_MAX_LEVEL) {
                     // 計算下一級成本

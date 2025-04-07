@@ -200,10 +200,13 @@ export class Bullet extends Entity {
                      // 計算子彈中心與敵人中心的距離平方
                      if (distanceSqValues(this.centerX, this.centerY, enemy.centerX, enemy.centerY) < requiredDistSq) {
                          const damageDealt = this.damage; // 造成的傷害
-                         enemy.takeDamage(damageDealt, game); // 敵人受到傷害 (傳遞 game 以便敵人處理後續邏輯)
+                         const enemyDied = enemy.takeDamage(damageDealt, game); // 敵人受到傷害，獲取是否死亡
                          collisionOccurred = true; // 標記發生碰撞
                          // 在敵人位置顯示傷害數字
                          game.addDamageNumber(enemy.centerX, enemy.y, damageDealt, this.color);
+                         if (enemyDied) {
+                             game.handleEnemyDefeat(enemy); // 如果敵人死亡，處理獎勵
+                         }
                          break; // 子彈擊中一個敵人後消失
                      }
                  }
@@ -349,10 +352,13 @@ export class Arrow extends Entity {
          if (distSq < hitThresholdSq) {
              // --- 命中目標 ---
              const damageDealt = this.damage; // 造成的傷害
-             this.target.takeDamage(damageDealt, game); // 目標受到傷害
+             const enemyDied = this.target.takeDamage(damageDealt, game); // 目標受到傷害，獲取是否死亡
              this.active = false; // 箭矢消失
              // 在目標位置顯示傷害數字 (玩家箭矢顏色)
              game.addDamageNumber(this.target.centerX, this.target.y, damageDealt, '#9ACD32'); // YellowGreen
+             if (enemyDied) {
+                 game.handleEnemyDefeat(this.target); // 如果敵人死亡，處理獎勵
+             }
              // 可選: 添加箭矢插入效果？
          } else {
              // --- 未命中，繼續移動 ---
@@ -511,11 +517,14 @@ export class EnergyBolt extends Entity {
                 // 進行碰撞檢測
                 if (simpleCollisionCheck(this, enemy)) {
                     const damageDealt = this.damage;
-                    enemy.takeDamage(damageDealt, game); // 敵人受到傷害
+                    const enemyDied = enemy.takeDamage(damageDealt, game); // 敵人受到傷害，獲取是否死亡
                     game.addDamageNumber(enemy.centerX, enemy.y, damageDealt, this.color); // 顯示傷害數字
 
                     // 將敵人 ID 加入已擊中列表，防止重複傷害
                     this.hitEnemies.add(enemy.id); // <--- 添加到 Set
+                    if (enemyDied) {
+                        game.handleEnemyDefeat(enemy); // 如果敵人死亡，處理獎勵
+                    }
 
                     // **** 注意：這裡不再設置 this.active = false ****
                     // 投射物會繼續飛行
@@ -622,11 +631,14 @@ export class EnergyBeam extends Entity {
                 // 進行碰撞檢測
                 if (simpleCollisionCheck(this, enemy)) {
                     const damageDealt = this.damage;
-                    enemy.takeDamage(damageDealt, game); // 敵人受到傷害
+                    const enemyDied = enemy.takeDamage(damageDealt, game); // 敵人受到傷害，獲取是否死亡
                     game.addDamageNumber(enemy.centerX, enemy.y, damageDealt, this.color); // 顯示傷害數字
 
                     // 將敵人 ID 加入已擊中列表，防止重複傷害
                     this.hitEnemies.add(enemy.id); // <--- 添加到 Set
+                    if (enemyDied) {
+                        game.handleEnemyDefeat(enemy); // 如果敵人死亡，處理獎勵
+                    }
 
                     // **** 注意：這裡不再設置 this.active = false ****
                     // 投射物會繼續飛行

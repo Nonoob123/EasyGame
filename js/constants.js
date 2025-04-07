@@ -92,8 +92,8 @@ export const gameConstants = (() => {
         ENEMY_COLLISION_DIST_SQ: (TILE_SIZE * 1.5) ** 2, // 敵人碰撞檢測距離的平方
         SAFE_SPAWN_DIST_SQ: (TILE_SIZE * 10) ** 2, // 確保敵人在玩家安全距離外生成的距離平方
         TIME_PER_DIFFICULTY_LEVEL: 7000, // 提升一級難度所需的時間（毫秒）
-        ENEMY_HP_SCALING_FACTOR: 0.15, // 敵人生命值隨難度等級的增長因子
-        ENEMY_DAMAGE_SCALING_FACTOR: 0.08, // 敵人傷害值隨難度等級的增長因子
+        ENEMY_HP_SCALING_FACTOR: 0.12, // 敵人生命值隨難度等級的增長因子
+        ENEMY_DAMAGE_SCALING_FACTOR: 0.07, // 敵人傷害值隨難度等級的增長因子
         ENEMY_BOOST_FACTOR_PER_5_LEVELS: 1.6, // 每 5 個難度等級，敵人獲得的額外增強因子
         ENEMY_SPEED_BASE: 1.0, // 敵人基礎移動速度
         ENEMY_WANDER_SPEED: 0.5, // 敵人閒晃時的移動速度
@@ -132,13 +132,15 @@ export const gameConstants = (() => {
         XP_REWARD_LEVEL_MULTIPLIER: 1.15, // 經驗獎勵隨敵人等級的乘數因子
         XP_REWARD_MINI_BOSS_MULTIPLIER: 5, // 擊殺迷你 Boss 的經驗獎勵乘數
         XP_REWARD_BOSS_MULTIPLIER: 20, // 擊殺 Boss 的經驗獎勵乘數
+        GOLD_REWARD_MINI_BOSS: 400, // 增加小Boss獎勵
+        GOLD_REWARD_BOSS: 1000, // 增加Boss獎勵
 
         // --- 武器：菜刀屬性 ---
         CLEAVER_MAX_LEVEL: 5, // 菜刀最高等級
         CLEAVER_BASE_DAMAGE: 16, // 菜刀基礎傷害
         CLEAVER_DAMAGE_INCREASE_PER_LEVEL: 5, // 菜刀每級增加的傷害
-        CLEAVER_BASE_COOLDOWN: 600, // 菜刀基礎冷卻時間（毫秒）
-        CLEAVER_COOLDOWN_MULTIPLIER: 1.6, // 菜刀冷卻時間隨等級的乘數因子（這裡似乎是增加冷卻？可能需要檢查邏輯）
+        CLEAVER_BASE_COOLDOWN: 100, // 菜刀基礎冷卻時間（毫秒）
+        CLEAVER_COOLDOWN_MULTIPLIER: 0.95, // 菜刀冷卻時間隨等級的乘數因子 (修正：應小於1以減少冷卻)
         CLEAVER_RANGE: TILE_SIZE * 3.0, // 菜刀攻擊範圍
         CLEAVER_COSTS: [0, 25, 60, 130, 250], // 菜刀升級成本（索引對應等級-1）
 
@@ -211,7 +213,7 @@ export const gameConstants = (() => {
 
         // 震盪波 (AOE1) 加成
         SKILL_AOE1_DAMAGE_PER_LEVEL: 120,     // 每級增加傷害
-        SKILL_AOE1_COOLDOWN_MULTIPLIER: 1.99, // 每級冷卻時間乘數 (減少 6%)
+        SKILL_AOE1_COOLDOWN_MULTIPLIER: 0.95, // 每級冷卻時間乘數 (修正：應小於1以減少冷卻)
         SKILL_AOE1_RADIUS_PER_LEVEL: TILE_SIZE * 0.15, // 每級增加半徑
 
         // 新星爆發 (AOE2) 加成
@@ -269,5 +271,7 @@ export const gameConstants = (() => {
             // 注意：這個數組的索引對應等級，索引 0 表示 0 級
         ],
         // PLAYER_BASE_DODGE_CHANCE: 0.00, // 確保基礎閃避為 0，如果需要基礎閃避，請取消註釋並調整上方數組
+        MINI_BOSS_SPAWN_LEVEL_INTERVAL: 3, // 每3關生成一次Mini-Boss
+        BOSS_SPAWN_LEVEL_INTERVAL: 5, // 每5關生成一次Boss
     };
 })(); // IIFE 結束
