@@ -635,7 +635,7 @@ export function drawMessages(ctx, game) {
    const canvasWidth = game.canvas.width; // 從 game 對象獲取畫布寬度
 
     // --- 根據消息內容調整樣式 (例如，初始目標消息) ---
-    let isGoalMessage = game.messageText.includes("堅持到關卡50");
+    let isGoalMessage = game.messageText.includes("堅持到50關卡");
     let currentFontSize = isGoalMessage ? baseFontSize + 12 : baseFontSize; // 初始目標消息字體更大 (+12 -> 28px) (加大)
     let currentFont = `bold ${currentFontSize}px 'Nunito', sans-serif`; // 確保粗體
     let textColor = isGoalMessage ? 'black' : 'white'; // 初始目標消息用黑色
@@ -745,7 +745,7 @@ function drawObjectiveBox(ctx, game) {
     // 目標文本內容
     const objectiveTitle = "遊戲目標：";
     const objectiveLines = [
-        "1. 堅持到關卡 50",
+        "1. 堅持到50關卡",
         "2. 場上會出現獎杯 🏆",
         "3. 把獎杯帶回安全區即可獲勝"
     ];

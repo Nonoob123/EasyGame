@@ -28,9 +28,9 @@ export const gameConstants = (() => {
     return {
         // --- 圖像資源 URL ---
         PLAYER_IMAGE_DATA_URL: 'https://lh3.googleusercontent.com/d/1EUKtxOBk2_gqWKWV3dPyNQec4wZGt3oH', // 玩家圖像
-        ENEMY_IMAGE_DATA_URL: 'https://lh3.googleusercontent.com/d/1DBdId0qyQ71fGvsgw1IP1EfUZhjlvdYS', // 普通敵人圖像
-        MINI_BOSS_IMAGE_URL: 'https://lh3.googleusercontent.com/d/1pDCDVEk38jJswoy_r2l18zd3b2IY4k5U', // 迷你 Boss 圖像
-        BOSS_IMAGE_URL: 'https://lh3.googleusercontent.com/d/1_Yfz7kU6GCg28W5xFw7r3hi1pW67cZYb', // Boss 圖像
+        ENEMY_IMAGE_DATA_URL: 'https://lh3.googleusercontent.com/d/1KJjenZtfeOByx-anum0wrlleGlQC5tOj', // 普通敵人圖像
+        MINI_BOSS_IMAGE_URL: 'https://lh3.googleusercontent.com/d/1AbsRrr3HFLvxNFC5fQ52cY4onZljvfRA', // 迷你 Boss 圖像
+        BOSS_IMAGE_URL: 'https://lh3.googleusercontent.com/d/14uHsPWQM4WkOS9ZtwCnsPdhqLxN0Nq35', // Boss 圖像
         TREE_IMAGE_URL: 'https://lh3.googleusercontent.com/d/18Dg-zoR7ImttNuvDpfaWucLP658spVE3', // 樹木圖像
 
         // --- 鏡頭縮放 ---
@@ -96,7 +96,7 @@ export const gameConstants = (() => {
         ENEMY_DAMAGE_SCALING_FACTOR: 0.07, // 敵人傷害值隨難度等級的增長因子
         ENEMY_BOOST_FACTOR_PER_5_LEVELS: 1.6, // 每 5 個難度等級，敵人獲得的額外增強因子
         ENEMY_SPEED_BASE: 1.0, // 敵人基礎移動速度
-        ENEMY_WANDER_SPEED: 0.5, // 敵人閒晃時的移動速度
+        ENEMY_WANDER_SPEED: 0.8, // 敵人閒晃時的移動速度
 
         // --- 環境物件 ---
         TREE_RESPAWN_TIME_MIN: 7000, // 樹木重生最短時間（毫秒）

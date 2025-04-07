@@ -87,6 +87,17 @@ export class Enemy extends Entity {
         this.imageLoaded = false;
         this.loadImage(imageUrl || (this.enemyType === 'mini-boss' ? this.constants.MINI_BOSS_IMAGE_URL : (this.enemyType === 'boss' ? this.constants.BOSS_IMAGE_URL : this.constants.ENEMY_IMAGE_DATA_URL)));
         this.setNewWanderTarget(this.constants);
+
+        // 添加精灵动画相关属性
+        this.spriteColumns = 6; // 每行6个帧
+        this.spriteRows = 2;    // 共2行
+        this.frameX = 0;        // 当前列
+        this.frameY = 0;        // 当前行 (0=前面, 1=后面)
+        this.animationSpeed = 360; // 调整动画速度
+        this.lastFrameTime = 0;
+        this.facingLeft = false; // 添加朝向标记
+        this.lastMoveX = 0;     // 上一帧的X方向移动
+        this.totalFrames = this.spriteColumns; // 每行的总帧数
     }
 
     loadImage(src) {
@@ -130,7 +141,10 @@ export class Enemy extends Entity {
         const constants = game.constants;
         let moveTargetX = null, moveTargetY = null, currentSpeed = 0;
 
-        // 根據 AI 狀態設置移動目標和速度
+        // 保存上一帧的移动方向
+        const lastFacingLeft = this.facingLeft;
+
+        // 根据 AI 状态设置移动目标和速度
         if (this.aiState === 'chasing') {
             moveTargetX = player.centerX;
             moveTargetY = player.centerY;
@@ -143,6 +157,29 @@ export class Enemy extends Entity {
             moveTargetX = this.wanderTargetX;
             moveTargetY = this.wanderTargetY;
             currentSpeed = constants.ENEMY_WANDER_SPEED;
+        }
+
+        // 计算移动方向
+        if (moveTargetX !== null && moveTargetY !== null) {
+            const dx = moveTargetX - this.centerX;
+            const dy = moveTargetY - this.centerY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            // 更新朝向 - 修正朝向逻辑
+            if (dist > 0) {
+                // 向右移动时朝向右边，向左移动时朝向左边
+                this.facingLeft = dx < 0;
+                
+                // 计算移动量
+                let moveX = 0, moveY = 0;
+                if (dist > 1) {
+                    moveX = (dx / dist) * currentSpeed * (deltaTime / 1000);
+                    moveY = (dy / dist) * currentSpeed * (deltaTime / 1000);
+                }
+                
+                // 保存当前X方向移动
+                this.lastMoveX = moveX;
+            }
         }
 
         // 執行移動
@@ -235,6 +272,7 @@ export class Enemy extends Entity {
         this._updateAIState(game.player, game.constants);
         this._updateMovement(deltaTime, game);
         this._handleAttacks(deltaTime, game);
+        this.updateAnimation(deltaTime); // 添加这一行
     }
 
     /**
@@ -289,7 +327,43 @@ export class Enemy extends Entity {
         if (!this.active) return;
 
         if (this.imageLoaded && this.image.complete && this.image.naturalWidth > 0) {
-            ctx.drawImage(this.image, this.x, this.y, this.width, this.height);
+            // 计算单个精灵的宽度和高度
+            const frameWidth = this.image.width / this.spriteColumns;
+            const frameHeight = this.image.height / this.spriteRows;
+            
+            ctx.save();
+            
+            if (!this.facingLeft) {
+                // 如果朝向右边，水平翻转图像
+                ctx.translate(this.x + this.width, 0);
+                ctx.scale(-1, 1);
+                ctx.drawImage(
+                    this.image, 
+                    this.frameX * frameWidth,
+                    this.frameY * frameHeight,
+                    frameWidth,
+                    frameHeight,
+                    0,
+                    this.y,
+                    this.width,
+                    this.height
+                );
+            } else {
+                // 正常绘制（朝向左边）
+                ctx.drawImage(
+                    this.image, 
+                    this.frameX * frameWidth,
+                    this.frameY * frameHeight,
+                    frameWidth,
+                    frameHeight,
+                    this.x,
+                    this.y,
+                    this.width,
+                    this.height
+                );
+            }
+            
+            ctx.restore();
         } else {
             ctx.fillStyle = this.color;
             ctx.fillRect(this.x, this.y, this.width, this.height);
@@ -369,24 +443,24 @@ export class Enemy extends Entity {
 
         this.wanderTargetX = targetX;
         this.wanderTargetY = targetY;
-
-        do {
-            targetX = Math.random() * (constants.WORLD_WIDTH - margin * 2) + margin;
-            targetY = Math.random() * (constants.WORLD_HEIGHT - margin * 2) + margin;
-            attempts++;
-        } while (
-             (targetX < constants.SAFE_ZONE_WIDTH &&
-              targetY > constants.SAFE_ZONE_TOP_Y &&
-              targetY < constants.SAFE_ZONE_BOTTOM_Y) &&
-              attempts < maxAttempts
-        );
-
-        if (targetX < constants.SAFE_ZONE_WIDTH && targetY > constants.SAFE_ZONE_TOP_Y && targetY < constants.SAFE_ZONE_BOTTOM_Y) {
-            targetX = constants.SAFE_ZONE_WIDTH + Math.random() * (constants.WORLD_WIDTH - constants.SAFE_ZONE_WIDTH - margin) + margin / 2;
-        }
-
-        this.wanderTargetX = targetX;
-        this.wanderTargetY = targetY;
         this.wanderTimer = constants.ENEMY_WANDER_CHANGE_DIR_TIME + Math.random() * 2000;
+    }
+
+    // 添加更新动画的方法
+    updateAnimation(deltaTime) {
+        // 更新动画帧
+        if (performance.now() - this.lastFrameTime > this.animationSpeed) {
+            // 更新帧索引，循环播放
+            this.frameX = (this.frameX + 1) % this.spriteColumns;
+            this.lastFrameTime = performance.now();
+            
+            // 只在转向时使用第二排的后面图
+            // 检测是否正在转向（从左到右或从右到左）
+            const isChangingDirection = (this.lastMoveX > 0 && this.facingLeft) || 
+                                       (this.lastMoveX < 0 && !this.facingLeft);
+            
+            // 如果正在转向，使用后面的图（第二排）
+            this.frameY = isChangingDirection ? 1 : 0;
+        }
     }
 }
