@@ -104,8 +104,12 @@ export class Game {
         this.enemySpawnTimer = 0;
         this.elapsedGameTime = 0;
         this.difficultyLevel = 0;
+        // Boss 生成追蹤器
         this.bossSpawnedForLevel = -1;
-        this.miniBossSpawnedForLevel = -1; // 添加這一行
+        this.miniBossSpawnedForLevel = -1;
+        this.miniBossASpawnedForLevel = -1; // 新增
+        this.miniBossBSpawnedForLevel = -1; // 新增
+        this.newBossSpawnedForLevel = -1;   // 新增
 
         // UI 消息
         this.messageText = '';
@@ -154,6 +158,9 @@ export class Game {
         // 初始化 Boss 生成追蹤變數
         this.miniBossSpawnedForLevel = 0;
         this.bossSpawnedForLevel = 0;
+        this.miniBossASpawnedForLevel = 0; // 新增
+        this.miniBossBSpawnedForLevel = 0; // 新增
+        this.newBossSpawnedForLevel = 0;   // 新增
 
         // 添加調試信息
         console.log(`遊戲初始化完成。難度等級: ${this.difficultyLevel}`);
@@ -346,8 +353,15 @@ export class Game {
         if (newDifficultyLevel > this.difficultyLevel) {
             console.log(`難度從 ${this.difficultyLevel} 提升至 ${newDifficultyLevel}`);
             this.difficultyLevel = newDifficultyLevel;
+            // 重置所有 Boss 生成標記
             this.bossSpawnedForLevel = -1;
+            this.miniBossSpawnedForLevel = -1;
+            this.miniBossASpawnedForLevel = -1;
+            this.miniBossBSpawnedForLevel = -1;
+            this.newBossSpawnedForLevel = -1;
             this.setMessage(`關卡 ${this.difficultyLevel}`, 2500);
+            // 關卡提升時立即檢查 Boss 生成
+            this.checkBossSpawns();
         };
         // --- 目標角色生成邏輯 ---
         if (this.difficultyLevel >= 50 && !this.goalCharacter) {
@@ -838,28 +852,61 @@ export class Game {
         console.log(`難度等級提升至: ${this.difficultyLevel}`);
         
         // 在難度提升時檢查是否應該生成 Boss
-        this.checkBossSpawns();
+        // this.checkBossSpawns(); // 移到難度提升時調用
     }
 
     // 添加一個專門檢查 Boss 生成的方法
     checkBossSpawns() {
-        // 檢查是否應該生成Mini-Boss
-        if (this.difficultyLevel % this.constants.MINI_BOSS_SPAWN_LEVEL_INTERVAL === 0 && 
-            this.miniBossSpawnedForLevel < this.difficultyLevel) {
-            // 確保Mini-Boss和Boss不會在同一關卡生成
-            if (this.difficultyLevel % this.constants.BOSS_SPAWN_LEVEL_INTERVAL !== 0) {
-                this.entityManager.spawnMiniBoss(this.difficultyLevel);
-                this.miniBossSpawnedForLevel = this.difficultyLevel;
-                console.log(`Mini-Boss已生成 (難度等級: ${this.difficultyLevel})`);
+        const level = this.difficultyLevel;
+        const constants = this.constants;
+
+        // --- 原有 Boss 生成邏輯 (保持不變) ---
+        // 檢查是否應該生成 Mini-Boss (原)
+        if (level % constants.MINI_BOSS_SPAWN_LEVEL_INTERVAL === 0 &&
+            this.miniBossSpawnedForLevel < level) {
+            // 原版邏輯：如果同時是 Boss 關卡，則不生成 Mini-Boss
+            if (level % constants.BOSS_SPAWN_LEVEL_INTERVAL !== 0) {
+                this.entityManager.spawnMiniBoss(level);
+                this.miniBossSpawnedForLevel = level;
+                console.log(`原 Mini-Boss 已生成 (關卡: ${level})`);
+            } else {
+                 console.log(`關卡 ${level}: 跳過原 Mini-Boss 生成，因為是 Boss 關卡。`);
             }
         }
 
-        // 檢查是否應該生成Boss
-        if (this.difficultyLevel % this.constants.BOSS_SPAWN_LEVEL_INTERVAL === 0 && 
-            this.bossSpawnedForLevel < this.difficultyLevel) {
-            this.entityManager.spawnBoss(this.difficultyLevel);
-            this.bossSpawnedForLevel = this.difficultyLevel;
-            console.log(`Boss已生成 (難度等級: ${this.difficultyLevel})`);
+        // 檢查是否應該生成 Boss (原)
+        if (level % constants.BOSS_SPAWN_LEVEL_INTERVAL === 0 &&
+            this.bossSpawnedForLevel < level) {
+            this.entityManager.spawnBoss(level);
+            this.bossSpawnedForLevel = level;
+            console.log(`原 Boss 已生成 (關卡: ${level})`);
+        }
+
+        // --- 新增 Boss 生成邏輯 ---
+        if (level >= constants.NEW_BOSS_START_LEVEL) {
+            // 檢查是否應該生成 Mini-Boss A
+            if (level % constants.MINI_BOSS_A_SPAWN_INTERVAL === 0 &&
+                this.miniBossASpawnedForLevel < level) {
+                this.entityManager.spawnMiniBossA(level);
+                this.miniBossASpawnedForLevel = level;
+                console.log(`Mini-Boss A 已生成 (關卡: ${level})`);
+            }
+
+            // 檢查是否應該生成 Mini-Boss B
+            if (level % constants.MINI_BOSS_B_SPAWN_INTERVAL === 0 &&
+                this.miniBossBSpawnedForLevel < level) {
+                this.entityManager.spawnMiniBossB(level);
+                this.miniBossBSpawnedForLevel = level;
+                console.log(`Mini-Boss B 已生成 (關卡: ${level})`);
+            }
+
+            // 檢查是否應該生成 New Boss
+            if (level % constants.NEW_BOSS_SPAWN_INTERVAL === 0 &&
+                this.newBossSpawnedForLevel < level) {
+                this.entityManager.spawnNewBoss(level);
+                this.newBossSpawnedForLevel = level;
+                console.log(`New Boss 已生成 (關卡: ${level})`);
+            }
         }
     }
 

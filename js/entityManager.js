@@ -62,19 +62,19 @@ export class EntityManager {
         // 如果嘗試次數過多，生成失敗
         if (attempts >= maxAttempts) {
              console.warn(`無法為 ${enemyType} 找到合適的生成位置，嘗試次數：${attempts}`);
-             return false; // 生成失敗
+             return null; // 生成失敗，返回 null
         }
         // 最後的安全區檢查
         if (!allowAnywhere && (x + size / 2 < constants.SAFE_ZONE_WIDTH && y + size / 2 > constants.SAFE_ZONE_TOP_Y && y + size / 2 < constants.SAFE_ZONE_BOTTOM_Y)) {
              console.warn(`${enemyType} 的生成嘗試最終位置在安全區內，中止生成。`);
-             return false; // 生成失敗
+             return null; // 生成失敗，返回 null
         }
 
         // 創建新的敵人實例
         const newEnemy = new Enemy(x, y, size, size, constants, difficultyLevel, enemyType, imageUrl);
         // 將新敵人添加到遊戲的敵人數組中（修改遊戲狀態）
         this.game.enemies.push(newEnemy);
-        return true; // 生成成功
+        return newEnemy; // 生成成功，返回創建的敵人對象
     }
 
     /**
@@ -146,8 +146,8 @@ export class EntityManager {
         // 嘗試生成特殊敵人
         if (Math.random() < specialEnemyChance) {
             // 決定生成哪種特殊敵人
-            const specialTypes = ['fast', 'tank', 'ranged'];
-            const specialWeights = [0.5, 0.3, 0.2]; // 不同類型的權重
+            const specialTypes = ['fast', 'tank', 'ranged', 'explosive', 'teleporter', 'summoner'];
+            const specialWeights = [0.25, 0.2, 0.2, 0.15, 0.1, 0.1]; // 不同類型的權重
             
             // 根據權重選擇敵人類型
             let typeIndex = 0;
@@ -173,6 +173,15 @@ export class EntityManager {
                 spawnHandled = true;
             } else if (specialType === 'ranged') {
                 this.spawnEnemy(false, difficultyLevel, 'ranged', constants.ENEMY_RANGED_IMAGE_URL);
+                spawnHandled = true;
+            } else if (specialType === 'explosive') {
+                this.spawnEnemy(false, difficultyLevel, 'explosive', constants.ENEMY_EXPLOSIVE_IMAGE_URL);
+                spawnHandled = true;
+            } else if (specialType === 'teleporter') {
+                this.spawnEnemy(false, difficultyLevel, 'teleporter', constants.ENEMY_TELEPORTER_IMAGE_URL);
+                spawnHandled = true;
+            } else if (specialType === 'summoner') {
+                this.spawnEnemy(false, difficultyLevel, 'summoner', constants.ENEMY_SUMMONER_IMAGE_URL);
                 spawnHandled = true;
             }
         }
@@ -457,4 +466,97 @@ export class EntityManager {
         console.log(`Boss已生成於 (${x.toFixed(0)}, ${y.toFixed(0)})`);
         return boss;
     }
-}
+
+    // --- 新增：生成新 Boss 的方法 ---
+
+    spawnMiniBossA(difficultyLevel) {
+        const constants = this.game.constants;
+        const size = constants.TILE_SIZE * 1.4; // 可以調整大小
+        let x, y, attempts = 0;
+        const maxAttempts = 50;
+
+        do {
+            x = Math.random() * (constants.WORLD_WIDTH - size * 2) + size;
+            y = Math.random() * (constants.WORLD_HEIGHT - size * 2) + size;
+            attempts++;
+            if (x < constants.SAFE_ZONE_WIDTH * 1.5) {
+                x = constants.SAFE_ZONE_WIDTH * 1.5 + Math.random() * 100;
+            }
+        } while (
+            this.game.enemies.some(e => e.active && distanceSqValues(x + size/2, y + size/2, e.centerX, e.centerY) < (size * 1.5) ** 2) &&
+            attempts < maxAttempts
+        );
+
+        if (attempts >= maxAttempts) {
+            console.warn("無法為 Mini-Boss A 找到合適的生成位置");
+            x = constants.WORLD_WIDTH * 0.7; y = constants.WORLD_HEIGHT * 0.6;
+        }
+
+        const miniBossA = new Enemy(x, y, size, size, constants, difficultyLevel, 'mini-boss-a', constants.MINI_BOSS_A_IMAGE_URL);
+        this.game.enemies.push(miniBossA);
+        this.game.setMessage(`衝撞小王來襲！`, 3000);
+        console.log(`Mini-Boss A 已生成於 (${x.toFixed(0)}, ${y.toFixed(0)})`);
+        return miniBossA;
+    }
+
+    spawnMiniBossB(difficultyLevel) {
+        const constants = this.game.constants;
+        const size = constants.TILE_SIZE * 1.6; // 可以調整大小
+        let x, y, attempts = 0;
+        const maxAttempts = 50;
+
+        do {
+            x = Math.random() * (constants.WORLD_WIDTH - size * 2) + size;
+            y = Math.random() * (constants.WORLD_HEIGHT - size * 2) + size;
+            attempts++;
+            if (x < constants.SAFE_ZONE_WIDTH * 1.5) {
+                x = constants.SAFE_ZONE_WIDTH * 1.5 + Math.random() * 100;
+            }
+        } while (
+            this.game.enemies.some(e => e.active && distanceSqValues(x + size/2, y + size/2, e.centerX, e.centerY) < (size * 1.5) ** 2) &&
+            attempts < maxAttempts
+        );
+
+        if (attempts >= maxAttempts) {
+            console.warn("無法為 Mini-Boss B 找到合適的生成位置");
+            x = constants.WORLD_WIDTH * 0.6; y = constants.WORLD_HEIGHT * 0.7;
+        }
+
+        const miniBossB = new Enemy(x, y, size, size, constants, difficultyLevel, 'mini-boss-b', constants.MINI_BOSS_B_IMAGE_URL);
+        this.game.enemies.push(miniBossB);
+        this.game.setMessage(`召喚小王降臨！`, 3000);
+        console.log(`Mini-Boss B 已生成於 (${x.toFixed(0)}, ${y.toFixed(0)})`);
+        return miniBossB;
+    }
+
+    spawnNewBoss(difficultyLevel) {
+        const constants = this.game.constants;
+        const size = constants.TILE_SIZE * 2.2; // 新 Boss 更大
+        let x, y, attempts = 0;
+        const maxAttempts = 50;
+
+        do {
+            x = Math.random() * (constants.WORLD_WIDTH - size * 2) + size;
+            y = Math.random() * (constants.WORLD_HEIGHT - size * 2) + size;
+            attempts++;
+            if (x < constants.SAFE_ZONE_WIDTH * 2) {
+                x = constants.SAFE_ZONE_WIDTH * 2 + Math.random() * 150;
+            }
+        } while (
+            this.game.enemies.some(e => e.active && distanceSqValues(x + size/2, y + size/2, e.centerX, e.centerY) < (size * 2) ** 2) &&
+            attempts < maxAttempts
+        );
+
+        if (attempts >= maxAttempts) {
+            console.warn("無法為 New Boss 找到合適的生成位置");
+            x = constants.WORLD_WIDTH * 0.85; y = constants.WORLD_HEIGHT * 0.4;
+        }
+
+        const newBoss = new Enemy(x, y, size, size, constants, difficultyLevel, 'new-boss', constants.NEW_BOSS_IMAGE_URL);
+        this.game.enemies.push(newBoss);
+        this.game.setMessage(`強大的新 Boss 出現了！`, 5000);
+        console.log(`New Boss 已生成於 (${x.toFixed(0)}, ${y.toFixed(0)})`);
+        return newBoss;
+    }
+
+} // EntityManager 類結束

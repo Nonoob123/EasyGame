@@ -32,6 +32,17 @@ export const gameConstants = (() => {
         MINI_BOSS_IMAGE_URL: 'https://lh3.googleusercontent.com/d/1AbsRrr3HFLvxNFC5fQ52cY4onZljvfRA', // 迷你 Boss 圖像
         BOSS_IMAGE_URL: 'https://lh3.googleusercontent.com/d/14uHsPWQM4WkOS9ZtwCnsPdhqLxN0Nq35', // Boss 圖像
         TREE_IMAGE_URL: 'https://lh3.googleusercontent.com/d/18Dg-zoR7ImttNuvDpfaWucLP658spVE3', // 樹木圖像
+        // 新增敵人類型圖片
+        ENEMY_FAST_IMAGE_URL: 'https://lh3.googleusercontent.com/d/1Vm5cvKoKrbRCKgRSSiecX7CIGO7vp9AE', // 快速敵人圖像
+        ENEMY_TANK_IMAGE_URL: 'https://lh3.googleusercontent.com/d/1dcEruOyiZCDhDfVLvasJYdqF6Is2eo21', // 坦克敵人圖像
+        ENEMY_RANGED_IMAGE_URL: 'https://lh3.googleusercontent.com/d/1cfcwn2Y4_ZVg1dW5MfswU0L8S0TCGbrb', // 遠程敵人圖像
+        ENEMY_EXPLOSIVE_IMAGE_URL: 'https://lh3.googleusercontent.com/d/1I_812uUFnKznCxNoelPuRgOdkzRosxK9', // 爆炸敵人圖像
+        ENEMY_TELEPORTER_IMAGE_URL: 'https://lh3.googleusercontent.com/d/1BDIY44qFF0VjkgCfNjl_ELL9IxW7JAvf', // 傳送敵人圖像
+        ENEMY_SUMMONER_IMAGE_URL: 'https://lh3.googleusercontent.com/d/1U6pKWjobSZ6JSuY5Kk2cYcJ2xzMV5UDy', // 召喚師敵人圖像
+        // 新增 Boss 圖像
+        MINI_BOSS_A_IMAGE_URL: 'https://lh3.googleusercontent.com/d/1fhjqi-RyuX-neRYH-iLkzA4P99MyMe41', // 新小王 快速衝撞 + 少量追蹤子彈
+        MINI_BOSS_B_IMAGE_URL: 'https://lh3.googleusercontent.com/d/1rQUqjg8Kb3nl3Q3h8HYc7fWLz5_obm0l', // 新小王 召喚普通小兵
+        NEW_BOSS_IMAGE_URL: 'https://lh3.googleusercontent.com/d/1N5oDJ05szNvxGerwoa0Xww3Es1ZMbbXm',    // 新大王 範圍震盪波 + 散射彈幕
 
         // --- 鏡頭縮放 ---
         CAMERA_ZOOM: 1.2, // 鏡頭放大倍數 (> 1 表示放大)
@@ -271,7 +282,50 @@ export const gameConstants = (() => {
             // 注意：這個數組的索引對應等級，索引 0 表示 0 級
         ],
         // PLAYER_BASE_DODGE_CHANCE: 0.00, // 確保基礎閃避為 0，如果需要基礎閃避，請取消註釋並調整上方數組
-        MINI_BOSS_SPAWN_LEVEL_INTERVAL: 3, // 每3關生成一次Mini-Boss
-        BOSS_SPAWN_LEVEL_INTERVAL: 5, // 每5關生成一次Boss
+        MINI_BOSS_SPAWN_LEVEL_INTERVAL: 3, // 原 Mini-Boss 生成間隔
+        BOSS_SPAWN_LEVEL_INTERVAL: 5, // 原 Boss 生成間隔
+        NEW_BOSS_START_LEVEL: 10, // 新 Boss 開始生成的關卡
+        MINI_BOSS_A_SPAWN_INTERVAL: 2, // 新小王 A 生成間隔
+        MINI_BOSS_B_SPAWN_INTERVAL: 3, // 新小王 B 生成間隔
+        NEW_BOSS_SPAWN_INTERVAL: 4,    // 新大王 生成間隔
+
+        // --- 新增敵人屬性常量 ---
+        // 快速敵人
+        FAST_ENEMY_SPEED_MULTIPLIER: 2.0, // 速度倍率
+        FAST_ENEMY_HP_MULTIPLIER: 0.7,    // 生命值倍率
+        FAST_ENEMY_DAMAGE_MULTIPLIER: 1.2, // 傷害倍率
+
+        // 坦克敵人
+        TANK_ENEMY_SPEED_MULTIPLIER: 0.7, // 速度倍率
+        TANK_ENEMY_HP_MULTIPLIER: 4.5,    // 生命值倍率
+        TANK_ENEMY_DAMAGE_MULTIPLIER: 1.5, // 傷害倍率
+
+        // 遠程敵人
+        RANGED_ENEMY_SPEED_MULTIPLIER: 0.9, // 速度倍率
+        RANGED_ENEMY_HP_MULTIPLIER: 0.7,    // 生命值倍率
+        RANGED_ENEMY_DAMAGE_MULTIPLIER: 1.3, // 傷害倍率
+        RANGED_ENEMY_ATTACK_RANGE: TILE_SIZE * 8, // 攻擊範圍
+        RANGED_ENEMY_PROJECTILE_SPEED: 3.5, // 投射物速度
+
+        // 爆炸敵人
+        EXPLOSIVE_ENEMY_SPEED_MULTIPLIER: 1.4, // 速度倍率
+        EXPLOSIVE_ENEMY_HP_MULTIPLIER: 0.9,    // 生命值倍率
+        EXPLOSIVE_ENEMY_DAMAGE_MULTIPLIER: 1.5, // 傷害倍率
+        EXPLOSIVE_ENEMY_EXPLOSION_RADIUS: TILE_SIZE * 3, // 爆炸半徑
+        EXPLOSIVE_ENEMY_EXPLOSION_DAMAGE: 30,  // 爆炸基礎傷害
+
+        // 傳送敵人
+        TELEPORTER_ENEMY_SPEED_MULTIPLIER: 1.0, // 速度倍率
+        TELEPORTER_ENEMY_HP_MULTIPLIER: 1.0,    // 生命值倍率
+        TELEPORTER_ENEMY_DAMAGE_MULTIPLIER: 1.1, // 傷害倍率
+        TELEPORTER_ENEMY_TELEPORT_COOLDOWN: 2000, // 傳送冷卻時間(毫秒)
+        TELEPORTER_ENEMY_TELEPORT_RANGE: TILE_SIZE * 7, // 傳送範圍
+
+        // 召喚師敵人
+        SUMMONER_ENEMY_SPEED_MULTIPLIER: 0.8, // 速度倍率
+        SUMMONER_ENEMY_HP_MULTIPLIER: 1.5,    // 生命值倍率
+        SUMMONER_ENEMY_DAMAGE_MULTIPLIER: 0.9, // 傷害倍率
+        SUMMONER_ENEMY_SUMMON_COOLDOWN: 1500, // 召喚冷卻時間(毫秒)
+        SUMMONER_ENEMY_MAX_SUMMONS: 6,        // 最大召喚數量
     };
 })(); // IIFE 結束
